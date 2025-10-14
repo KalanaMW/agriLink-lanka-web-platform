@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useState } from 'react'
-
+//Mac,Dev
 export default function Register() {
   const [role, setRole] = useState('')
   const [doc, setDoc] = useState<File | null>(null)
