@@ -4,7 +4,14 @@ export default function Footer() {
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <div>
-                        <h3 className="text-lg font-bold mb-4">🌱 AgriLink Lanka</h3>
+                        <div className="flex items-center gap-2 mb-4">
+                            <img 
+                                src="https://res.cloudinary.com/dgyqfax25/image/upload/v1761895483/d5513655-e2aa-4582-8bf8-5c3c196fa828_vnk5cq.png" 
+                                alt="AgriLink Lanka Logo" 
+                                className="h-8 w-8 object-contain"
+                            />
+                            <h3 className="text-lg font-bold">AgriLink Lanka</h3>
+                        </div>
                         <p>Connecting Sri Lankan farmers with global exporters.</p>
                     </div>
 
