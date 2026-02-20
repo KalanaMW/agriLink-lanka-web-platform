@@ -408,6 +408,11 @@ public class ProductsController : ControllerBase
     // Helper method to map Product to ProductResponseDto
     private ProductResponseDto MapToResponseDto(Product product, User farmer)
     {
+        // Calculate sold quantity from non-cancelled order items
+        var soldQuantity = _context.OrderItems
+            .Where(oi => oi.ProductId == product.Id && oi.Order.Status != "Cancelled")
+            .Sum(oi => oi.Quantity);
+
         return new ProductResponseDto
         {
             Id = product.Id,
@@ -424,6 +429,8 @@ public class ProductsController : ControllerBase
             Status = product.Status,
             ImageUrl = product.ImageUrl,
             CertificationUrl = product.CertificationUrl,
+            SoldQuantityKg = soldQuantity,
+            TotalQuantityKg = product.AvailableQuantityKg + soldQuantity,
             FarmerId = product.FarmerId,
             FarmerName = farmer.FullName,
             FarmerEmail = farmer.Email,

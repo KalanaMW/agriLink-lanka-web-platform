@@ -4,28 +4,51 @@ import { useAuth } from '@/contexts/AuthContext';
 import { RoleProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useEffect, useState } from 'react';
 import { productService } from '@/services/productService';
-import { Product } from '@/types';
+import { authService } from '@/services/authService';
+import { dashboardService } from '@/services/dashboardService';
+import { Product, User, AdminDashboard as AdminDashboardType } from '@/types';
 import { getImageUrl, formatCurrency, formatDate } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fadeInUp, staggerContainer } from '@/components/animations/PageTransition';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [pendingProducts, setPendingProducts] = useState<Product[]>([]);
+  const [unverifiedExporters, setUnverifiedExporters] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [dashboardData, setDashboardData] = useState<AdminDashboardType | null>(null);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<number | null>(null);
+  const [verifyingId, setVerifyingId] = useState<number | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [activeTab, setActiveTab] = useState<'products' | 'exporters' | 'users'>('products');
+  const [userRoleFilter, setUserRoleFilter] = useState<string>('');
+  const [confirmModal, setConfirmModal] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    variant: 'danger' | 'success' | 'warning';
+    confirmLabel: string;
+    onConfirm: () => void;
+  }>({ open: false, title: '', message: '', variant: 'success', confirmLabel: 'Confirm', onConfirm: () => {} });
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [all, pending] = await Promise.all([
+      const [all, pending, exporters, dashboard, users] = await Promise.all([
         productService.getProducts({}),
-        productService.getPendingProducts()
+        productService.getPendingProducts(),
+        authService.getUnverifiedExporters(),
+        dashboardService.getAdminDashboard().catch(() => null),
+        authService.getAllUsers().catch(() => []),
       ]);
       setAllProducts(Array.isArray(all) ? all : (all.products || []));
       setPendingProducts(pending);
+      setUnverifiedExporters(exporters);
+      if (dashboard) setDashboardData(dashboard);
+      setAllUsers(users);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -37,39 +60,83 @@ export default function AdminDashboard() {
     fetchData();
   }, []);
 
-  const handleApprove = async (id: number) => {
-    if (!confirm('Are you sure you want to approve this product?')) return;
-    
-    try {
-      setProcessingId(id);
-      await productService.approveProduct(id);
-      await fetchData();
-      setSelectedProduct(null);
-    } catch (error) {
-      console.error('Failed to approve product:', error);
-      alert('Failed to approve product. Please try again.');
-    } finally {
-      setProcessingId(null);
-    }
+  const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, open: false }));
+
+  const handleApprove = (id: number) => {
+    setConfirmModal({
+      open: true,
+      title: 'Approve Product',
+      message: 'Are you sure you want to approve this product? It will become visible on the marketplace.',
+      variant: 'success',
+      confirmLabel: 'Approve',
+      onConfirm: async () => {
+        closeConfirmModal();
+        try {
+          setProcessingId(id);
+          await productService.approveProduct(id);
+          await fetchData();
+          setSelectedProduct(null);
+        } catch (error) {
+          console.error('Failed to approve product:', error);
+          alert('Failed to approve product. Please try again.');
+        } finally {
+          setProcessingId(null);
+        }
+      },
+    });
   };
 
-  const handleReject = async (id: number) => {
-    if (!confirm('Are you sure you want to reject and delete this product?')) return;
-    
-    try {
-      setProcessingId(id);
-      await productService.rejectProduct(id);
-      await fetchData();
-      setSelectedProduct(null);
-    } catch (error) {
-      console.error('Failed to reject product:', error);
-      alert('Failed to reject product. Please try again.');
-    } finally {
-      setProcessingId(null);
-    }
+  const handleReject = (id: number) => {
+    setConfirmModal({
+      open: true,
+      title: 'Reject Product',
+      message: 'Are you sure you want to reject and delete this product? This action cannot be undone.',
+      variant: 'danger',
+      confirmLabel: 'Reject',
+      onConfirm: async () => {
+        closeConfirmModal();
+        try {
+          setProcessingId(id);
+          await productService.rejectProduct(id);
+          await fetchData();
+          setSelectedProduct(null);
+        } catch (error) {
+          console.error('Failed to reject product:', error);
+          alert('Failed to reject product. Please try again.');
+        } finally {
+          setProcessingId(null);
+        }
+      },
+    });
+  };
+
+  const handleVerifyExporter = (userId: number) => {
+    setConfirmModal({
+      open: true,
+      title: 'Verify Exporter',
+      message: 'Are you sure you want to verify this exporter? They will gain access to purchase products on the platform.',
+      variant: 'success',
+      confirmLabel: 'Verify',
+      onConfirm: async () => {
+        closeConfirmModal();
+        try {
+          setVerifyingId(userId);
+          await authService.verifyExporter(userId);
+          await fetchData();
+        } catch (error) {
+          console.error('Failed to verify exporter:', error);
+          alert('Failed to verify exporter. Please try again.');
+        } finally {
+          setVerifyingId(null);
+        }
+      },
+    });
   };
 
   const availableProducts = allProducts?.filter(p => p.status === 'Available') || [];
+  const filteredUsers = userRoleFilter
+    ? allUsers.filter(u => u.role === userRoleFilter)
+    : allUsers;
 
   return (
     <RoleProtectedRoute allowedRoles={['Admin']}>
@@ -82,28 +149,59 @@ export default function AdminDashboard() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-500">Total Products</div>
-              <div className="mt-2 text-3xl font-bold text-gray-900">{allProducts?.length || 0}</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-white rounded-lg shadow p-5">
+              <div className="text-sm font-medium text-gray-500">Total Users</div>
+              <div className="mt-2 text-3xl font-bold text-gray-900">{dashboardData?.totalUsers || 0}</div>
+              <div className="text-xs text-gray-400 mt-1">{dashboardData?.totalFarmers || 0} farmers, {dashboardData?.totalExporters || 0} exporters</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg shadow p-5">
               <div className="text-sm font-medium text-gray-500">Pending Approval</div>
               <div className="mt-2 text-3xl font-bold text-yellow-600">{pendingProducts?.length || 0}</div>
+              <div className="text-xs text-gray-400 mt-1">products await review</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-500">Available</div>
-              <div className="mt-2 text-3xl font-bold text-green-600">{availableProducts.length}</div>
+            <div className="bg-white rounded-lg shadow p-5">
+              <div className="text-sm font-medium text-gray-500">Unverified Exporters</div>
+              <div className="mt-2 text-3xl font-bold text-orange-600">{unverifiedExporters?.length || 0}</div>
+              <div className="text-xs text-gray-400 mt-1">need verification</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-500">Total Stock</div>
-              <div className="mt-2 text-3xl font-bold text-gray-900">
-                {allProducts?.reduce((sum, p) => sum + p.availableQuantityKg, 0) || 0} kg
-              </div>
+            <div className="bg-white rounded-lg shadow p-5">
+              <div className="text-sm font-medium text-gray-500">Total Revenue</div>
+              <div className="mt-2 text-2xl font-bold text-green-600">{formatCurrency(dashboardData?.totalRevenue || 0)}</div>
+              <div className="text-xs text-gray-400 mt-1">{dashboardData?.totalOrders || 0} orders</div>
             </div>
           </div>
 
-          {/* Pending Approvals Section */}
+          {/* Tab Navigation */}
+          <div className="flex border-b border-gray-200 mb-6">
+            <button
+              onClick={() => setActiveTab('products')}
+              className={`px-6 py-3 font-semibold text-sm border-b-2 transition ${
+                activeTab === 'products' ? 'border-green-600 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Product Management ({pendingProducts?.length || 0} pending)
+            </button>
+            <button
+              onClick={() => setActiveTab('exporters')}
+              className={`px-6 py-3 font-semibold text-sm border-b-2 transition ${
+                activeTab === 'exporters' ? 'border-green-600 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Exporter Verification ({unverifiedExporters?.length || 0} pending)
+            </button>
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`px-6 py-3 font-semibold text-sm border-b-2 transition ${
+                activeTab === 'users' ? 'border-green-600 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Registered Users ({allUsers?.length || 0})
+            </button>
+          </div>
+
+          {activeTab === 'products' && (
+          <>
           <div className="bg-white rounded-lg shadow p-6 mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
               Pending Product Approvals ({pendingProducts?.length || 0})
@@ -299,10 +397,193 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
+          </>
+          )}
+
+          {activeTab === 'exporters' && (
+          <>
+          {/* Unverified Exporters Section */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              Unverified Exporters ({unverifiedExporters?.length || 0})
+            </h2>
+            {loading ? (
+              <div className="text-center py-12 text-gray-500">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+                <p className="mt-4">Loading exporters...</p>
+              </div>
+            ) : unverifiedExporters.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12 mx-auto mb-3 text-gray-400">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
+                </svg>
+                <p>All exporters are verified!</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {unverifiedExporters.map((exporter) => (
+                  <div key={exporter.id} className="border rounded-lg p-5 hover:shadow-lg transition-shadow">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-lg">
+                        {exporter.fullName.charAt(0)}
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{exporter.fullName}</h3>
+                        <p className="text-sm text-gray-500">{exporter.email}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2 text-sm mb-4">
+                      {exporter.companyName && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Company:</span>
+                          <span className="font-medium text-gray-900">{exporter.companyName}</span>
+                        </div>
+                      )}
+                      {exporter.district && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">District:</span>
+                          <span className="font-medium text-gray-900">{exporter.district}</span>
+                        </div>
+                      )}
+                      {exporter.phoneNumber && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Phone:</span>
+                          <span className="font-medium text-gray-900">{exporter.phoneNumber}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Registered:</span>
+                        <span className="font-medium text-gray-900">{formatDate(exporter.createdAt)}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                        Unverified
+                      </span>
+                      <button
+                        onClick={() => handleVerifyExporter(exporter.id)}
+                        disabled={verifyingId === exporter.id}
+                        className="px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 text-sm"
+                      >
+                        {verifyingId === exporter.id ? 'Verifying...' : 'Verify Exporter'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          </>
+          )}
+
+          {activeTab === 'users' && (
+          <>
+          {/* All Registered Users Section */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">
+                All Registered Users ({filteredUsers.length})
+              </h2>
+              <div className="flex gap-2">
+                {['', 'Farmer', 'Exporter'].map((role) => (
+                  <button
+                    key={role}
+                    onClick={() => setUserRoleFilter(role)}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-full transition ${
+                      userRoleFilter === role
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {role || 'All'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {loading ? (
+              <div className="text-center py-12 text-gray-500">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+                <p className="mt-4">Loading users...</p>
+              </div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No users found.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">District</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registered</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredUsers.map((u) => (
+                      <tr key={u.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="h-10 w-10 flex-shrink-0">
+                              {u.profileImageUrl ? (
+                                <img className="h-10 w-10 rounded-full object-cover" src={getImageUrl(u.profileImageUrl)} alt={u.fullName} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                              ) : (
+                                <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold">
+                                  {u.fullName.charAt(0)}
+                                </div>
+                              )}
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">{u.fullName}</div>
+                              <div className="text-sm text-gray-500">{u.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            u.role === 'Farmer' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {u.role}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {u.district || '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {u.phoneNumber || '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {u.companyName || '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            u.isVerified ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+                          }`}>
+                            {u.isVerified ? 'Verified' : 'Unverified'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(u.createdAt)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          </>
+          )}
+
         </div>
       </div>
 
-      {/* Product Detail Modal */}
       {selectedProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -427,6 +708,16 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.open}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmVariant={confirmModal.variant}
+        confirmLabel={confirmModal.confirmLabel}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={closeConfirmModal}
+      />
     </RoleProtectedRoute>
   );
 }

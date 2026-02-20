@@ -49,7 +49,7 @@ public class DashboardController : ControllerBase
                 .CountAsync();
 
             var totalRevenue = await _context.OrderItems
-                .Where(oi => oi.Product.FarmerId == userId && oi.Order.Status == "Completed")
+                .Where(oi => oi.Product.FarmerId == userId && oi.Order.Status == "Delivered")
                 .SumAsync(oi => oi.Subtotal);
 
             var recentProducts = await _context.Products
@@ -73,6 +73,12 @@ public class DashboardController : ControllerBase
                     Status = p.Status,
                     ImageUrl = p.ImageUrl,
                     CertificationUrl = p.CertificationUrl,
+                    SoldQuantityKg = _context.OrderItems
+                        .Where(oi => oi.ProductId == p.Id && oi.Order.Status != "Cancelled")
+                        .Sum(oi => oi.Quantity),
+                    TotalQuantityKg = p.AvailableQuantityKg + _context.OrderItems
+                        .Where(oi => oi.ProductId == p.Id && oi.Order.Status != "Cancelled")
+                        .Sum(oi => oi.Quantity),
                     FarmerId = p.FarmerId,
                     FarmerName = p.Farmer.FullName,
                     FarmerEmail = p.Farmer.Email,
@@ -121,11 +127,11 @@ public class DashboardController : ControllerBase
                 .CountAsync();
 
             var completedOrders = await _context.Orders
-                .Where(o => o.ExporterId == userId && o.Status == "Completed")
+                .Where(o => o.ExporterId == userId && o.Status == "Delivered")
                 .CountAsync();
 
             var totalSpent = await _context.Orders
-                .Where(o => o.ExporterId == userId && o.Status == "Completed")
+                .Where(o => o.ExporterId == userId && o.Status == "Delivered")
                 .SumAsync(o => o.TotalAmount);
 
             var recommendedProducts = await _context.Products
@@ -149,6 +155,8 @@ public class DashboardController : ControllerBase
                     Status = p.Status,
                     ImageUrl = p.ImageUrl,
                     CertificationUrl = p.CertificationUrl,
+                    SoldQuantityKg = 0,
+                    TotalQuantityKg = p.AvailableQuantityKg,
                     FarmerId = p.FarmerId,
                     FarmerName = p.Farmer.FullName,
                     FarmerEmail = p.Farmer.Email,
@@ -205,7 +213,7 @@ public class DashboardController : ControllerBase
             var totalOrders = await _context.Orders.CountAsync();
 
             var totalRevenue = await _context.Orders
-                .Where(o => o.Status == "Completed")
+                .Where(o => o.Status == "Delivered")
                 .SumAsync(o => o.TotalAmount);
 
             var recentPendingProducts = await _context.Products
@@ -229,6 +237,8 @@ public class DashboardController : ControllerBase
                     Status = p.Status,
                     ImageUrl = p.ImageUrl,
                     CertificationUrl = p.CertificationUrl,
+                    SoldQuantityKg = 0,
+                    TotalQuantityKg = p.AvailableQuantityKg,
                     FarmerId = p.FarmerId,
                     FarmerName = p.Farmer.FullName,
                     FarmerEmail = p.Farmer.Email,

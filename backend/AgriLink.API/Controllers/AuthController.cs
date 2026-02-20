@@ -82,6 +82,7 @@ namespace AgriLink.API.Controllers
                     companyName = user.CompanyName,
                     isVerified = user.IsVerified,
                     isActive = user.IsActive,
+                    profileImageUrl = user.ProfileImageUrl,
                     createdAt = user.CreatedAt
                 }
             });
@@ -131,6 +132,7 @@ namespace AgriLink.API.Controllers
                     companyName = user.CompanyName,
                     isVerified = user.IsVerified,
                     isActive = user.IsActive,
+                    profileImageUrl = user.ProfileImageUrl,
                     createdAt = user.CreatedAt
                 }
             });
@@ -166,6 +168,7 @@ namespace AgriLink.API.Controllers
                 CompanyName = user.CompanyName,
                 IsVerified = user.IsVerified,
                 IsActive = user.IsActive,
+                ProfileImageUrl = user.ProfileImageUrl,
                 CreatedAt = user.CreatedAt
             });
         }
@@ -217,6 +220,44 @@ namespace AgriLink.API.Controllers
                 .ToListAsync();
 
             return Ok(exporters);
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpGet("users")]
+        public async Task<ActionResult<List<UserDto>>> GetAllUsers([FromQuery] string? role = null)
+        {
+            var query = _context.Users.AsQueryable();
+
+            if (!string.IsNullOrEmpty(role))
+            {
+                query = query.Where(u => u.Role == role);
+            }
+            else
+            {
+                // Exclude admins by default
+                query = query.Where(u => u.Role != "Admin");
+            }
+
+            var users = await query
+                .OrderByDescending(u => u.CreatedAt)
+                .Select(u => new UserDto
+                {
+                    Id = u.Id,
+                    FullName = u.FullName,
+                    Email = u.Email,
+                    Role = u.Role,
+                    District = u.District,
+                    Address = u.Address,
+                    PhoneNumber = u.PhoneNumber,
+                    CompanyName = u.CompanyName,
+                    IsVerified = u.IsVerified,
+                    IsActive = u.IsActive,
+                    ProfileImageUrl = u.ProfileImageUrl,
+                    CreatedAt = u.CreatedAt
+                })
+                .ToListAsync();
+
+            return Ok(users);
         }
     }
 }

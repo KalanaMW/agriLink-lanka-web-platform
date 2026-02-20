@@ -4,14 +4,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import { RoleProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useEffect, useState } from 'react';
 import { productService } from '@/services/productService';
-import { Product } from '@/types';
+import { dashboardService } from '@/services/dashboardService';
+import { Product, ExporterDashboard as ExporterDashboardType } from '@/types';
 import { getImageUrl, formatCurrency, formatDate } from '@/lib/utils';
+
+import { useRouter } from 'next/navigation';
 
 export default function ExporterDashboard() {
   const { user } = useAuth();
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState<ExporterDashboardType | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [filters, setFilters] = useState({
     district: '',
@@ -21,20 +26,24 @@ export default function ExporterDashboard() {
   });
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchData = async () => {
       try {
-        const data = await productService.getProducts({ status: 'Available' });
-        const productList = Array.isArray(data) ? data : (data.products || []);
+        const [productData, dashboard] = await Promise.all([
+          productService.getProducts({ status: 'Available' }),
+          dashboardService.getExporterDashboard().catch(() => null),
+        ]);
+        const productList = Array.isArray(productData) ? productData : (productData.products || []);
         setProducts(productList);
         setFilteredProducts(productList);
+        setDashboardData(dashboard);
       } catch (error) {
-        console.error('Failed to fetch products:', error);
+        console.error('Failed to fetch data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProducts();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -90,24 +99,28 @@ export default function ExporterDashboard() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div className="bg-white rounded-lg shadow p-6">
               <div className="text-sm font-medium text-gray-500">Available Products</div>
-              <div className="mt-2 text-3xl font-bold text-gray-900">{availableProducts.length}</div>
+              <div className="mt-2 text-3xl font-bold text-gray-900">{dashboardData?.availableProducts ?? availableProducts.length}</div>
+              <div className="text-xs text-gray-400 mt-1">{exportReadyProducts.length} export ready</div>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-500">Export Ready</div>
-              <div className="mt-2 text-3xl font-bold text-blue-600">{exportReadyProducts.length}</div>
+              <div className="text-sm font-medium text-gray-500">My Orders</div>
+              <div className="mt-2 text-3xl font-bold text-blue-600">{dashboardData?.totalOrders ?? 0}</div>
+              <div className="text-xs text-gray-400 mt-1">{dashboardData?.pendingOrders ?? 0} pending</div>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-500">Organic Products</div>
-              <div className="mt-2 text-3xl font-bold text-green-600">{organicProducts.length}</div>
+              <div className="text-sm font-medium text-gray-500">Completed Orders</div>
+              <div className="mt-2 text-3xl font-bold text-green-600">{dashboardData?.completedOrders ?? 0}</div>
+              <div className="text-xs text-gray-400 mt-1">delivered successfully</div>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-500">Total Stock</div>
-              <div className="mt-2 text-3xl font-bold text-gray-900">
-                {products.reduce((sum, p) => sum + p.availableQuantityKg, 0)} kg
+              <div className="text-sm font-medium text-gray-500">Total Spent</div>
+              <div className="mt-2 text-2xl font-bold text-gray-900">
+                {formatCurrency(dashboardData?.totalSpent ?? 0)}
               </div>
+              <div className="text-xs text-gray-400 mt-1">on delivered orders</div>
             </div>
           </div>
 
@@ -122,7 +135,7 @@ export default function ExporterDashboard() {
                   value={filters.searchTerm}
                   onChange={(e) => setFilters({ ...filters, searchTerm: e.target.value })}
                   placeholder="Search vegetables..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                 />
               </div>
               <div>
@@ -130,7 +143,7 @@ export default function ExporterDashboard() {
                 <select
                   value={filters.district}
                   onChange={(e) => setFilters({ ...filters, district: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                 >
                   <option value="">All Districts</option>
                   {districts.map(district => (
@@ -371,7 +384,7 @@ export default function ExporterDashboard() {
               <button
                 onClick={() => {
                   if (user?.isVerified) {
-                    alert('Order functionality coming soon!');
+                    router.push(`/orders?productId=${selectedProduct.id}&maxQty=${selectedProduct.availableQuantityKg}`);
                   } else {
                     alert('Please wait for your account to be verified by an admin.');
                   }
