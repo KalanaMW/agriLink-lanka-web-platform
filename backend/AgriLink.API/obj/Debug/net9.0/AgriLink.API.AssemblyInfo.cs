@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AgriLink.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+54e7569ac036220b1fd5a93061c767f474f069ad")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7fbbd3331bd453b1b780217d25474ca6a4294d67")]
 [assembly: System.Reflection.AssemblyProductAttribute("AgriLink.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AgriLink.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
