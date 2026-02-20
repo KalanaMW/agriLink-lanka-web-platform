@@ -53,6 +53,8 @@ export interface Product {
   status: 'Pending' | 'Available' | 'Sold' | 'OutOfStock';
   imageUrl?: string;
   certificationUrl?: string;
+  soldQuantityKg: number;
+  totalQuantityKg: number;
   farmerId: number;
   farmerName: string;
   farmerEmail: string;
@@ -102,6 +104,60 @@ export interface CreateProductDto {
   isOrganic: boolean;
   productImage?: File;
   certificationDocument?: File;
+}
+
+// Order types
+export interface Order {
+  id: number;
+  orderNumber: string;
+  exporterId: number;
+  exporterName: string;
+  exporterEmail: string;
+  totalAmount: number;
+  status: 'Pending' | 'Confirmed' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
+  paymentStatus: 'Pending' | 'Completed' | 'Failed' | 'Refunded';
+  shippingAddress?: string;
+  shippingMethod?: string;
+  shippingCost?: number;
+  trackingNumber?: string;
+  shippedDate?: string;
+  deliveredDate?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+  items: OrderItem[];
+  transaction?: Transaction;
+}
+
+export interface OrderItem {
+  id: number;
+  productId: number;
+  vegetableName: string;
+  grade: string;
+  district: string;
+  imageUrl?: string;
+  farmerName: string;
+  quantity: number;
+  pricePerUnit: number;
+  subtotal: number;
+}
+
+export interface Transaction {
+  id: number;
+  transactionId: string;
+  amount: number;
+  currency: string;
+  paymentMethod: string;
+  status: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface CreateOrderDto {
+  items: { productId: number; quantity: number }[];
+  shippingAddress?: string;
+  shippingMethod?: string;
+  notes?: string;
 }
 
 // Dashboard types

@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { productService } from '@/services/productService';
 import { Product, ProductFilter } from '@/types';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { getImageUrl } from '@/lib/utils';
 
 const DISTRICTS = [
   'Colombo', 'Gampaha', 'Kalutara', 'Kandy', 'Matale', 'Nuwara Eliya',
@@ -122,7 +124,7 @@ export default function ProductsPage() {
                     placeholder="e.g., Tomato"
                     value={filters.vegetableName || ''}
                     onChange={(e) => handleFilterChange('vegetableName', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                   />
                 </div>
 
@@ -134,7 +136,7 @@ export default function ProductsPage() {
                   <select
                     value={filters.district || ''}
                     onChange={(e) => handleFilterChange('district', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                   >
                     <option value="">All Districts</option>
                     {DISTRICTS.map((district) => (
@@ -153,7 +155,7 @@ export default function ProductsPage() {
                   <select
                     value={filters.grade || ''}
                     onChange={(e) => handleFilterChange('grade', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                   >
                     <option value="">All Grades</option>
                     {GRADES.map((grade) => (
@@ -175,14 +177,14 @@ export default function ProductsPage() {
                       placeholder="Min"
                       value={filters.minPrice || ''}
                       onChange={(e) => handleFilterChange('minPrice', e.target.value ? Number(e.target.value) : undefined)}
-                      className="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                      className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     />
                     <input
                       type="number"
                       placeholder="Max"
                       value={filters.maxPrice || ''}
                       onChange={(e) => handleFilterChange('maxPrice', e.target.value ? Number(e.target.value) : undefined)}
-                      className="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                      className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     />
                   </div>
                 </div>
@@ -198,14 +200,14 @@ export default function ProductsPage() {
                       placeholder="Min"
                       value={filters.minQuantity || ''}
                       onChange={(e) => handleFilterChange('minQuantity', e.target.value ? Number(e.target.value) : undefined)}
-                      className="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                      className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     />
                     <input
                       type="number"
                       placeholder="Max"
                       value={filters.maxQuantity || ''}
                       onChange={(e) => handleFilterChange('maxQuantity', e.target.value ? Number(e.target.value) : undefined)}
-                      className="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                      className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     />
                   </div>
                 </div>
@@ -240,7 +242,7 @@ export default function ProductsPage() {
                   <select
                     value={filters.sortBy || 'DateDesc'}
                     onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                   >
                     <option value="DateDesc">Newest First</option>
                     <option value="DateAsc">Oldest First</option>
@@ -288,7 +290,7 @@ export default function ProductsPage() {
                       <div key={product.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition">
                         {product.imageUrl ? (
                           <img
-                            src={product.imageUrl}
+                            src={getImageUrl(product.imageUrl)}
                             alt={product.vegetableName}
                             className="w-full h-48 object-cover"
                           />
@@ -313,7 +315,7 @@ export default function ProductsPage() {
                           </div>
 
                           <div className="space-y-1 text-sm text-gray-600 mb-3">
-                            <p>📦 Available: {product.availableQuantityKg} kg</p>
+                            <p>📦 Available: {product.availableQuantityKg} kg{(product.soldQuantityKg ?? 0) > 0 ? ` (${product.soldQuantityKg} kg sold)` : ''}</p>
                             <p>📍 District: {product.district}</p>
                             <p>👨‍🌾 {product.farmerName}</p>
                           </div>
@@ -331,9 +333,9 @@ export default function ProductsPage() {
                             )}
                           </div>
 
-                          <button className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition font-semibold">
+                          <Link href={`/products/${product.id}`} className="block w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition font-semibold text-center">
                             View Details
-                          </button>
+                          </Link>
                         </div>
                       </div>
                     ))}

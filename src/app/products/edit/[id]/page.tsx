@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { productService } from '@/services/productService';
 import { Product } from '@/types';
 import { RoleProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { getImageUrl } from '@/lib/utils';
 
 const districts = [
   'Colombo', 'Gampaha', 'Kalutara', 'Kandy', 'Matale', 'Nuwara Eliya',
@@ -14,7 +15,7 @@ const districts = [
   'Monaragala', 'Ratnapura', 'Kegalle'
 ];
 
-const grades = ['A', 'B', 'Premium', 'Standard'];
+const grades = ['A', 'B', 'C'];
 
 export default function EditProductPage() {
   const router = useRouter();
@@ -76,8 +77,10 @@ export default function EditProductPage() {
 
     if (!formData.vegetableName.trim()) newErrors.vegetableName = 'Vegetable name is required';
     if (!formData.grade) newErrors.grade = 'Grade is required';
-    if (!formData.pricePerKg || Number(formData.pricePerKg) <= 0) newErrors.pricePerKg = 'Valid price is required';
-    if (!formData.availableQuantityKg || Number(formData.availableQuantityKg) <= 0) newErrors.availableQuantityKg = 'Valid quantity is required';
+    const price = Number(formData.pricePerKg);
+    if (!formData.pricePerKg || isNaN(price) || price <= 0) newErrors.pricePerKg = 'Price must be a positive number';
+    const qty = Number(formData.availableQuantityKg);
+    if (!formData.availableQuantityKg || isNaN(qty) || qty <= 0) newErrors.availableQuantityKg = 'Quantity must be a positive number';
     if (!formData.harvestDate) newErrors.harvestDate = 'Harvest date is required';
     if (!formData.district) newErrors.district = 'District is required';
 
@@ -169,8 +172,10 @@ export default function EditProductPage() {
                   type="text"
                   value={formData.vegetableName}
                   onChange={(e) => setFormData({ ...formData, vegetableName: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                   placeholder="e.g., Tomato, Carrot"
+                  required
+                  maxLength={100}
                 />
                 {errors.vegetableName && <p className="mt-1 text-sm text-red-600">{errors.vegetableName}</p>}
               </div>
@@ -184,8 +189,9 @@ export default function EditProductPage() {
                   type="text"
                   value={formData.variety}
                   onChange={(e) => setFormData({ ...formData, variety: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                   placeholder="e.g., Cherry Tomato"
+                  maxLength={100}
                 />
               </div>
 
@@ -198,7 +204,7 @@ export default function EditProductPage() {
                   <select
                     value={formData.grade}
                     onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                   >
                     <option value="">Select Grade</option>
                     {grades.map((grade) => (
@@ -215,7 +221,7 @@ export default function EditProductPage() {
                   <select
                     value={formData.district}
                     onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                   >
                     <option value="">Select District</option>
                     {districts.map((district) => (
@@ -235,10 +241,12 @@ export default function EditProductPage() {
                   <input
                     type="number"
                     step="0.01"
+                    min="0.01"
                     value={formData.pricePerKg}
                     onChange={(e) => setFormData({ ...formData, pricePerKg: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     placeholder="0.00"
+                    required
                   />
                   {errors.pricePerKg && <p className="mt-1 text-sm text-red-600">{errors.pricePerKg}</p>}
                 </div>
@@ -250,10 +258,12 @@ export default function EditProductPage() {
                   <input
                     type="number"
                     step="0.01"
+                    min="0.01"
                     value={formData.availableQuantityKg}
                     onChange={(e) => setFormData({ ...formData, availableQuantityKg: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     placeholder="0.00"
+                    required
                   />
                   {errors.availableQuantityKg && <p className="mt-1 text-sm text-red-600">{errors.availableQuantityKg}</p>}
                 </div>
@@ -268,7 +278,7 @@ export default function EditProductPage() {
                   type="date"
                   value={formData.harvestDate}
                   onChange={(e) => setFormData({ ...formData, harvestDate: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                 />
                 {errors.harvestDate && <p className="mt-1 text-sm text-red-600">{errors.harvestDate}</p>}
               </div>
@@ -282,8 +292,9 @@ export default function EditProductPage() {
                   rows={4}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                   placeholder="Additional details about your product..."
+                  maxLength={1000}
                 />
               </div>
 
@@ -295,7 +306,7 @@ export default function EditProductPage() {
                 {product?.imageUrl && (
                   <div className="mb-2">
                     <img
-                      src={`http://localhost:5189${product.imageUrl}`}
+                      src={getImageUrl(product.imageUrl)}
                       alt="Current"
                       className="h-20 w-20 object-cover rounded"
                     />
@@ -305,7 +316,7 @@ export default function EditProductPage() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   onChange={(e) => setNewProductImage(e.target.files?.[0] || null)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                 />
                 <p className="mt-1 text-sm text-gray-500">Max 5MB - JPEG, PNG, or WebP</p>
                 {errors.productImage && <p className="mt-1 text-sm text-red-600">{errors.productImage}</p>}
@@ -318,7 +329,7 @@ export default function EditProductPage() {
                 </label>
                 {product?.certificationUrl && (
                   <div className="mb-2">
-                    <a href={`http://localhost:5189${product.certificationUrl}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                    <a href={getImageUrl(product.certificationUrl)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
                       View current document
                     </a>
                   </div>
@@ -327,7 +338,7 @@ export default function EditProductPage() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp,application/pdf"
                   onChange={(e) => setNewCertificationDoc(e.target.files?.[0] || null)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                 />
                 <p className="mt-1 text-sm text-gray-500">Max 5MB - JPEG, PNG, WebP, or PDF</p>
                 {errors.certificationDocument && <p className="mt-1 text-sm text-red-600">{errors.certificationDocument}</p>}

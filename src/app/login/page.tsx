@@ -30,10 +30,21 @@ export default function Login() {
         e.preventDefault();
         setError('');
         setSuccess('');
+
+        const trimmedEmail = formData.email.trim();
+        if (!trimmedEmail) {
+            setError('Email is required');
+            return;
+        }
+        if (!formData.password) {
+            setError('Password is required');
+            return;
+        }
+
         setIsLoading(true);
 
         try {
-            const response = await login(formData.email, formData.password);
+            const response = await login(trimmedEmail, formData.password);
             setSuccess('Login successful! Redirecting...');
             
             // Redirect based on role
@@ -93,7 +104,7 @@ export default function Login() {
                             value={formData.email}
                             onChange={handleChange}
                             autoComplete="email"
-                            className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-black focus:outline-none"
+                            className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 bg-white text-gray-900 focus:border-green-500 focus:outline-none transition"
                             required
                         />
                     </div>
@@ -106,7 +117,7 @@ export default function Login() {
                             value={formData.password}
                             onChange={handleChange}
                             autoComplete="current-password"
-                            className="w-full px-4 py-3 pr-12 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-black focus:outline-none"
+                            className="w-full px-4 py-3 pr-12 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 bg-white text-gray-900 focus:border-green-500 focus:outline-none transition"
                             required
                         />
                         <button

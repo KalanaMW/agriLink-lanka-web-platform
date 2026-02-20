@@ -17,6 +17,10 @@ public class ProductResponseDto
     public string? ImageUrl { get; set; }
     public string? CertificationUrl { get; set; }
     
+    // Quantity tracking
+    public decimal SoldQuantityKg { get; set; }
+    public decimal TotalQuantityKg { get; set; }
+    
     // Farmer information
     public int FarmerId { get; set; }
     public string FarmerName { get; set; } = string.Empty;

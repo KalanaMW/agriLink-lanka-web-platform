@@ -1,48 +1,541 @@
 'use client';
 
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { useRouter } from 'next/navigation';
+import { PageTransition } from '@/components/animations/PageTransition';
+import { orderService } from '@/services/orderService';
+import { productService } from '@/services/productService';
+import { Order, Product } from '@/types';
+import { formatCurrency, formatDate, getImageUrl } from '@/lib/utils';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
-export default function OrdersPage() {
+const STATUS_COLORS: Record<string, string> = {
+  Pending: 'bg-yellow-100 text-yellow-800',
+  Confirmed: 'bg-blue-100 text-blue-800',
+  Processing: 'bg-purple-100 text-purple-800',
+  Shipped: 'bg-indigo-100 text-indigo-800',
+  Delivered: 'bg-green-100 text-green-800',
+  Cancelled: 'bg-red-100 text-red-800',
+};
+
+const PAYMENT_COLORS: Record<string, string> = {
+  Pending: 'bg-yellow-100 text-yellow-800',
+  Completed: 'bg-green-100 text-green-800',
+  Failed: 'bg-red-100 text-red-800',
+  Refunded: 'bg-gray-100 text-gray-800',
+};
+
+function OrdersContent() {
+  const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [processingId, setProcessingId] = useState<number | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    variant: 'danger' | 'success' | 'warning';
+    confirmLabel: string;
+    onConfirm: () => void;
+  }>({ open: false, title: '', message: '', variant: 'success', confirmLabel: 'Confirm', onConfirm: () => {} });
+  const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, open: false }));
+
+  // New order form state
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [orderProduct, setOrderProduct] = useState<Product | null>(null);
+  const [orderQuantity, setOrderQuantity] = useState('');
+  const [shippingAddress, setShippingAddress] = useState('');
+  const [shippingMethod, setShippingMethod] = useState('Standard');
+  const [orderNotes, setOrderNotes] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+
+  useEffect(() => {
+    fetchOrders();
+    // Check if we arrived from product detail page with product info
+    const productId = searchParams.get('productId');
+    if (productId && user?.role === 'Exporter') {
+      loadProductForOrder(Number(productId));
+    }
+  }, [searchParams, user]);
+
+  const fetchOrders = async () => {
+    try {
+      const data = await orderService.getOrders();
+      setOrders(data);
+    } catch (error) {
+      console.error('Failed to fetch orders:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadProductForOrder = async (productId: number) => {
+    try {
+      const product = await productService.getProduct(productId);
+      setOrderProduct(product);
+      setShowCreateForm(true);
+      const qty = searchParams.get('maxQty');
+      if (qty) setOrderQuantity(Math.min(100, Number(qty)).toString());
+    } catch {
+      console.error('Failed to load product for order');
+    }
+  };
+
+  const handleCreateOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!orderProduct) return;
+    setCreateError('');
+
+    const qty = Number(orderQuantity);
+    if (isNaN(qty) || qty <= 0 || qty > orderProduct.availableQuantityKg) {
+      setCreateError(`Quantity must be between 0.01 and ${orderProduct.availableQuantityKg} kg`);
+      return;
+    }
+
+    if (shippingMethod !== 'Self-Pickup' && !shippingAddress?.trim()) {
+      setCreateError('Shipping address is required for delivery/courier orders');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      await orderService.createOrder({
+        items: [{ productId: orderProduct.id, quantity: qty }],
+        shippingAddress: shippingAddress?.trim() || undefined,
+        shippingMethod: shippingMethod || undefined,
+        notes: orderNotes?.trim() || undefined,
+      });
+      setShowCreateForm(false);
+      setOrderProduct(null);
+      setOrderQuantity('');
+      setShippingAddress('');
+      setOrderNotes('');
+      await fetchOrders();
+    } catch (err: any) {
+      setCreateError(err.response?.data?.message || 'Failed to create order.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleCancelOrder = (orderId: number) => {
+    setConfirmModal({
+      open: true,
+      title: 'Cancel Order',
+      message: 'Are you sure you want to cancel this order? This action cannot be undone.',
+      variant: 'danger',
+      confirmLabel: 'Cancel Order',
+      onConfirm: async () => {
+        closeConfirmModal();
+        try {
+          setProcessingId(orderId);
+          await orderService.cancelOrder(orderId);
+          setSelectedOrder(null);
+          await fetchOrders();
+        } catch (err: any) {
+          alert(err.response?.data?.message || 'Failed to cancel order.');
+        } finally {
+          setProcessingId(null);
+        }
+      },
+    });
+  };
+
+  const handleConfirmPayment = (orderId: number) => {
+    setConfirmModal({
+      open: true,
+      title: 'Confirm Payment',
+      message: 'Confirm that you have completed the payment for this order?',
+      variant: 'success',
+      confirmLabel: 'Confirm Payment',
+      onConfirm: async () => {
+        closeConfirmModal();
+        try {
+          setProcessingId(orderId);
+          await orderService.confirmPayment(orderId);
+          setSelectedOrder(null);
+          await fetchOrders();
+        } catch (err: any) {
+          alert(err.response?.data?.message || 'Failed to confirm payment.');
+        } finally {
+          setProcessingId(null);
+        }
+      },
+    });
+  };
+
+  const handleStatusUpdate = async (orderId: number, newStatus: string) => {
+    try {
+      setProcessingId(orderId);
+      await orderService.updateOrderStatus(orderId, { status: newStatus });
+      setSelectedOrder(null);
+      await fetchOrders();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to update order status.');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const getNextStatuses = (status: string): string[] => {
+    const transitions: Record<string, string[]> = {
+      Pending: ['Confirmed', 'Cancelled'],
+      Confirmed: ['Processing', 'Cancelled'],
+      Processing: ['Shipped', 'Cancelled'],
+      Shipped: ['Delivered'],
+    };
+    return transitions[status] || [];
+  };
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="mb-8">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center text-green-600 hover:text-green-700 mb-4"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-              </svg>
-              Back
-            </button>
-            <h1 className="text-3xl font-bold text-gray-900">My Orders</h1>
-            <p className="mt-2 text-gray-600">View and manage your orders</p>
-          </div>
-
-          {/* Orders List */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-center py-16 text-gray-500">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-20 h-20 mx-auto mb-4 text-gray-400">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
-              </svg>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Orders Yet</h3>
-              <p className="text-gray-600 mb-6">Orders from exporters will appear here</p>
-              <button
-                onClick={() => router.push('/dashboard/farmer')}
-                className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-semibold"
-              >
-                Back to Dashboard
-              </button>
+      <PageTransition>
+        <div className="min-h-screen bg-gray-50 py-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
+                <p className="mt-1 text-gray-600">
+                  {user?.role === 'Exporter' ? 'Manage your orders and track deliveries' :
+                   user?.role === 'Farmer' ? 'View orders containing your products' :
+                   'Manage all platform orders'}
+                </p>
+              </div>
+              {user?.role === 'Exporter' && (
+                <button
+                  onClick={() => router.push('/products')}
+                  className="bg-green-600 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-green-700 transition"
+                >
+                  Browse Products
+                </button>
+              )}
             </div>
+
+            {/* Create Order Form */}
+            {showCreateForm && orderProduct && user?.role === 'Exporter' && (
+              <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border-2 border-green-200">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">New Order</h2>
+                
+                {/* Product summary */}
+                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg mb-4">
+                  <img
+                    src={getImageUrl(orderProduct.imageUrl)}
+                    alt={orderProduct.vegetableName}
+                    className="w-16 h-16 rounded-lg object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-product.svg'; }}
+                  />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900">{orderProduct.vegetableName} - Grade {orderProduct.grade}</h3>
+                    <p className="text-sm text-gray-500">{orderProduct.district} &middot; {orderProduct.farmerName}</p>
+                    <p className="text-green-600 font-bold">{formatCurrency(orderProduct.pricePerKg)}/kg &middot; {orderProduct.availableQuantityKg} kg available</p>
+                  </div>
+                  <button onClick={() => { setShowCreateForm(false); setOrderProduct(null); }} className="text-gray-400 hover:text-gray-600">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+
+                {createError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">{createError}</div>
+                )}
+
+                <form onSubmit={handleCreateOrder} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Quantity (kg) *</label>
+                      <input
+                        type="number" step="0.01" min="0.01" max={orderProduct.availableQuantityKg}
+                        value={orderQuantity} onChange={(e) => setOrderQuantity(e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                        required
+                      />
+                      {orderQuantity && (
+                        <p className="mt-1 text-sm text-gray-500">
+                          Subtotal: {formatCurrency(Number(orderQuantity) * orderProduct.pricePerKg)}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Shipping Method</label>
+                      <select value={shippingMethod} onChange={(e) => setShippingMethod(e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                      >
+                        <option value="Standard">Standard</option>
+                        <option value="Express">Express</option>
+                        <option value="Self-Pickup">Self-Pickup</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Shipping Address</label>
+                    <textarea value={shippingAddress} onChange={(e) => setShippingAddress(e.target.value)} rows={2}
+                      placeholder="Enter delivery address..."
+                      maxLength={500}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <textarea value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} rows={2}
+                      placeholder="Special instructions..."
+                      maxLength={1000}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button type="submit" disabled={creating}
+                      className="bg-green-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-green-700 transition disabled:opacity-50"
+                    >
+                      {creating ? 'Placing Order...' : 'Place Order'}
+                    </button>
+                    <button type="button" onClick={() => { setShowCreateForm(false); setOrderProduct(null); }}
+                      className="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-50 transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Orders List */}
+            {loading ? (
+              <div className="text-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600 mx-auto"></div>
+                <p className="mt-4 text-gray-500">Loading orders...</p>
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="text-center py-20 bg-white rounded-xl shadow">
+                <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">No Orders Yet</h3>
+                <p className="text-gray-500 mb-4">
+                  {user?.role === 'Exporter' ? 'Browse products and place your first order!' : 'Orders will appear here when exporters purchase products.'}
+                </p>
+                {user?.role === 'Exporter' && (
+                  <button onClick={() => router.push('/products')} className="bg-green-600 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-green-700 transition">
+                    Browse Products
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {orders.map((order) => (
+                  <div key={order.id} className="bg-white rounded-xl shadow-md p-5 hover:shadow-lg transition cursor-pointer"
+                    onClick={() => setSelectedOrder(order)}
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="font-bold text-gray-900">{order.orderNumber}</h3>
+                          <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${STATUS_COLORS[order.status]}`}>
+                            {order.status}
+                          </span>
+                          <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${PAYMENT_COLORS[order.paymentStatus]}`}>
+                            Payment: {order.paymentStatus}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-4 text-sm text-gray-500">
+                          <span>{order.items.length} item{order.items.length > 1 ? 's' : ''}</span>
+                          <span>{formatDate(order.createdAt)}</span>
+                          {user?.role !== 'Exporter' && <span>By: {order.exporterName}</span>}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-green-700">{formatCurrency(order.totalAmount)}</p>
+                      </div>
+                    </div>
+
+                    {/* Items preview */}
+                    <div className="mt-3 flex gap-2 flex-wrap">
+                      {order.items.slice(0, 3).map((item) => (
+                        <span key={item.id} className="inline-flex items-center gap-1 bg-gray-100 px-3 py-1 rounded-full text-xs text-gray-700">
+                          {item.vegetableName} ({item.quantity} kg)
+                        </span>
+                      ))}
+                      {order.items.length > 3 && (
+                        <span className="text-xs text-gray-400">+{order.items.length - 3} more</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-      </div>
+
+        {/* Order Detail Modal */}
+        {selectedOrder && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedOrder(null)}>
+            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="p-6">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">{selectedOrder.orderNumber}</h2>
+                    <p className="text-sm text-gray-500">Placed on {formatDate(selectedOrder.createdAt)}</p>
+                  </div>
+                  <button onClick={() => setSelectedOrder(null)} className="text-gray-400 hover:text-gray-600">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Status badges */}
+                <div className="flex gap-3 mb-6">
+                  <span className={`px-3 py-1 text-sm font-semibold rounded-full ${STATUS_COLORS[selectedOrder.status]}`}>
+                    {selectedOrder.status}
+                  </span>
+                  <span className={`px-3 py-1 text-sm font-semibold rounded-full ${PAYMENT_COLORS[selectedOrder.paymentStatus]}`}>
+                    Payment: {selectedOrder.paymentStatus}
+                  </span>
+                </div>
+
+                {/* Order items */}
+                <div className="space-y-3 mb-6">
+                  <h3 className="font-semibold text-gray-700">Items</h3>
+                  {selectedOrder.items.map((item) => (
+                    <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                      <img
+                        src={getImageUrl(item.imageUrl)}
+                        alt={item.vegetableName}
+                        className="w-12 h-12 rounded-lg object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-product.svg'; }}
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">{item.vegetableName} (Grade {item.grade})</p>
+                        <p className="text-xs text-gray-500">{item.district} &middot; {item.farmerName}</p>
+                      </div>
+                      <div className="text-right text-sm">
+                        <p>{item.quantity} kg x {formatCurrency(item.pricePerUnit)}</p>
+                        <p className="font-bold text-gray-900">{formatCurrency(item.subtotal)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Order details grid */}
+                <div className="grid grid-cols-2 gap-4 text-sm mb-6">
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-gray-500">Total Amount</p>
+                    <p className="font-bold text-lg text-green-700">{formatCurrency(selectedOrder.totalAmount)}</p>
+                  </div>
+                  {selectedOrder.shippingAddress && (
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <p className="text-gray-500">Shipping Address</p>
+                      <p className="font-medium">{selectedOrder.shippingAddress}</p>
+                    </div>
+                  )}
+                  {selectedOrder.shippingMethod && (
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <p className="text-gray-500">Shipping Method</p>
+                      <p className="font-medium">{selectedOrder.shippingMethod}</p>
+                    </div>
+                  )}
+                  {selectedOrder.trackingNumber && (
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <p className="text-gray-500">Tracking Number</p>
+                      <p className="font-medium">{selectedOrder.trackingNumber}</p>
+                    </div>
+                  )}
+                  {selectedOrder.notes && (
+                    <div className="bg-gray-50 p-3 rounded-lg col-span-2">
+                      <p className="text-gray-500">Notes</p>
+                      <p className="font-medium">{selectedOrder.notes}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Transaction info */}
+                {selectedOrder.transaction && (
+                  <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                    <h3 className="font-semibold text-blue-800 mb-2">Transaction Details</h3>
+                    <div className="text-sm space-y-1">
+                      <p><span className="text-blue-600">ID:</span> {selectedOrder.transaction.transactionId}</p>
+                      <p><span className="text-blue-600">Amount:</span> {formatCurrency(selectedOrder.transaction.amount)} {selectedOrder.transaction.currency}</p>
+                      <p><span className="text-blue-600">Method:</span> {selectedOrder.transaction.paymentMethod}</p>
+                      <p><span className="text-blue-600">Status:</span> {selectedOrder.transaction.status}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex flex-wrap gap-3">
+                  {/* Exporter can confirm payment on pending orders */}
+                  {user?.role === 'Exporter' && selectedOrder.paymentStatus === 'Pending' && selectedOrder.status !== 'Cancelled' && (
+                    <button
+                      onClick={() => handleConfirmPayment(selectedOrder.id)}
+                      disabled={processingId === selectedOrder.id}
+                      className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+                    >
+                      {processingId === selectedOrder.id ? 'Processing...' : 'Confirm Payment'}
+                    </button>
+                  )}
+
+                  {/* Exporter can cancel pending/confirmed orders */}
+                  {user?.role === 'Exporter' && (selectedOrder.status === 'Pending' || selectedOrder.status === 'Confirmed') && (
+                    <button
+                      onClick={() => handleCancelOrder(selectedOrder.id)}
+                      disabled={processingId === selectedOrder.id}
+                      className="bg-red-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-red-700 transition disabled:opacity-50"
+                    >
+                      Cancel Order
+                    </button>
+                  )}
+
+                  {/* Admin/Farmer can update status */}
+                  {(user?.role === 'Admin' || user?.role === 'Farmer') && getNextStatuses(selectedOrder.status).length > 0 && (
+                    <>
+                      {getNextStatuses(selectedOrder.status).map((status) => (
+                        <button
+                          key={status}
+                          onClick={() => handleStatusUpdate(selectedOrder.id, status)}
+                          disabled={processingId === selectedOrder.id}
+                          className={`px-5 py-2.5 rounded-lg font-semibold transition disabled:opacity-50 ${
+                            status === 'Cancelled' ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-green-600 text-white hover:bg-green-700'
+                          }`}
+                        >
+                          {processingId === selectedOrder.id ? 'Processing...' : `Mark as ${status}`}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Confirm Modal */}
+        <ConfirmModal
+          isOpen={confirmModal.open}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmVariant={confirmModal.variant}
+          confirmLabel={confirmModal.confirmLabel}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={closeConfirmModal}
+        />
+      </PageTransition>
     </ProtectedRoute>
+  );
+}
+
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600"></div>
+      </div>
+    }>
+      <OrdersContent />
+    </Suspense>
   );
 }

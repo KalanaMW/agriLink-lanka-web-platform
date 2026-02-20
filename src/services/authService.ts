@@ -55,4 +55,10 @@ export const authService = {
     const response = await api.get<User[]>('/auth/unverified-exporters');
     return response.data;
   },
+
+  async getAllUsers(role?: string): Promise<User[]> {
+    const params = role ? `?role=${role}` : '';
+    const response = await api.get<User[]>(`/auth/users${params}`);
+    return response.data;
+  },
 };

@@ -4,49 +4,67 @@ import { useAuth } from '@/contexts/AuthContext';
 import { RoleProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useEffect, useState } from 'react';
 import { productService } from '@/services/productService';
-import { Product } from '@/types';
+import { dashboardService } from '@/services/dashboardService';
+import { Product, FarmerDashboard as FarmerDashboardType } from '@/types';
 import { getImageUrl, formatCurrency, formatDate } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { fadeInUp, staggerContainer } from '@/components/animations/PageTransition';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 export default function FarmerDashboard() {
   const { user } = useAuth();
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
+  const [dashboardData, setDashboardData] = useState<FarmerDashboardType | null>(null);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ open: false, title: '', message: '', onConfirm: () => {} });
+  const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, open: false }));
 
-  const fetchProducts = async () => {
+  const fetchData = async () => {
     try {
-      const data = await productService.getMyProducts();
-      setProducts(data);
+      const [productsData, dashboard] = await Promise.all([
+        productService.getMyProducts(),
+        dashboardService.getFarmerDashboard().catch(() => null),
+      ]);
+      setProducts(productsData);
+      if (dashboard) setDashboardData(dashboard);
     } catch (error) {
-      console.error('Failed to fetch products:', error);
+      console.error('Failed to fetch data:', error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchProducts();
+    fetchData();
   }, []);
 
-  const handleDelete = async (id: number, name: string) => {
-    if (!confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      setDeletingId(id);
-      await productService.deleteProduct(id);
-      await fetchProducts();
-    } catch (error) {
-      console.error('Failed to delete product:', error);
-      alert('Failed to delete product. Please try again.');
-    } finally {
-      setDeletingId(null);
-    }
+  const handleDelete = (id: number, name: string) => {
+    setConfirmModal({
+      open: true,
+      title: 'Delete Product',
+      message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
+      onConfirm: async () => {
+        closeConfirmModal();
+        try {
+          setDeletingId(id);
+          await productService.deleteProduct(id);
+          await fetchData();
+        } catch (error) {
+          console.error('Failed to delete product:', error);
+          alert('Failed to delete product. Please try again.');
+        } finally {
+          setDeletingId(null);
+        }
+      },
+    });
   };
 
   return (
@@ -74,30 +92,93 @@ export default function FarmerDashboard() {
             initial="initial"
             animate="animate"
             variants={staggerContainer}
-            className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
           >
             <motion.div variants={fadeInUp} whileHover={{ scale: 1.05, y: -5 }} className="bg-white rounded-lg shadow p-6">
               <div className="text-sm font-medium text-gray-500">Total Products</div>
-              <div className="mt-2 text-3xl font-bold text-gray-900">{products.length}</div>
+              <div className="mt-2 text-3xl font-bold text-gray-900">{dashboardData?.totalProducts ?? products.length}</div>
+              <div className="text-xs text-gray-400 mt-1">{dashboardData?.approvedProducts ?? products.filter(p => p.status === 'Available').length} available</div>
             </motion.div>
             <motion.div variants={fadeInUp} whileHover={{ scale: 1.05, y: -5 }} className="bg-white rounded-lg shadow p-6">
               <div className="text-sm font-medium text-gray-500">Pending Approval</div>
               <div className="mt-2 text-3xl font-bold text-yellow-600">
-                {products.filter(p => p.status === 'Pending').length}
+                {dashboardData?.pendingProducts ?? products.filter(p => p.status === 'Pending').length}
               </div>
+              <div className="text-xs text-gray-400 mt-1">awaiting admin review</div>
             </motion.div>
             <motion.div variants={fadeInUp} whileHover={{ scale: 1.05, y: -5 }} className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-500">Available</div>
-              <div className="mt-2 text-3xl font-bold text-green-600">
-                {products.filter(p => p.status === 'Available').length}
+              <div className="text-sm font-medium text-gray-500">Total Orders</div>
+              <div className="mt-2 text-3xl font-bold text-blue-600">
+                {dashboardData?.totalOrders ?? 0}
               </div>
+              <div className="text-xs text-gray-400 mt-1">orders containing your products</div>
             </motion.div>
             <motion.div variants={fadeInUp} whileHover={{ scale: 1.05, y: -5 }} className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-500">Total Stock</div>
-              <div className="mt-2 text-3xl font-bold text-gray-900">
-                {products.reduce((sum, p) => sum + p.availableQuantityKg, 0)} kg
+              <div className="text-sm font-medium text-gray-500">Total Revenue</div>
+              <div className="mt-2 text-2xl font-bold text-green-600">
+                {formatCurrency(dashboardData?.totalRevenue ?? 0)}
               </div>
+              <div className="text-xs text-gray-400 mt-1">from delivered orders</div>
             </motion.div>
+          </motion.div>
+
+          {/* Stock Summary - Per Product */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25, duration: 0.5 }}
+            className="bg-white rounded-lg shadow p-6 mb-8"
+          >
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Stock Summary</h2>
+            {products.length === 0 ? (
+              <p className="text-gray-500 text-sm">No products listed yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {products.map((product) => {
+                  const total = product.totalQuantityKg || product.availableQuantityKg;
+                  const sold = product.soldQuantityKg || 0;
+                  const available = product.availableQuantityKg;
+                  const soldPercent = total > 0 ? Math.min(100, (sold / total) * 100) : 0;
+
+                  return (
+                    <div key={product.id} className="border border-gray-100 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={getImageUrl(product.imageUrl)}
+                            alt={product.vegetableName}
+                            className="w-8 h-8 rounded-full object-cover"
+                            onError={(e) => { e.currentTarget.src = '/placeholder-product.svg'; }}
+                          />
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{product.vegetableName}</p>
+                            {product.variety && <p className="text-xs text-gray-500">{product.variety}</p>}
+                          </div>
+                        </div>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          product.status === 'Available' ? 'bg-green-100 text-green-700' :
+                          product.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {product.status}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                        <div
+                          className="bg-green-500 h-2 rounded-full transition-all"
+                          style={{ width: `${soldPercent}%` }}
+                        ></div>
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span className="text-green-700 font-medium">{available} kg available</span>
+                        <span className="text-blue-600">{sold} kg sold</span>
+                        <span>{total} kg total</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </motion.div>
 
           {/* Quick Actions */}
@@ -269,8 +350,11 @@ export default function FarmerDashboard() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatCurrency(product.pricePerKg)}/kg
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {product.availableQuantityKg} kg
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <div className="text-gray-900">{product.availableQuantityKg} kg remaining</div>
+                          {(product.soldQuantityKg ?? 0) > 0 && (
+                            <div className="text-xs text-blue-600">{product.soldQuantityKg} kg sold</div>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -320,6 +404,16 @@ export default function FarmerDashboard() {
           </motion.div>
         </div>
       </motion.div>
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.open}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmVariant="danger"
+        confirmLabel="Delete"
+        onConfirm={confirmModal.onConfirm}
+        onCancel={closeConfirmModal}
+      />
     </RoleProtectedRoute>
   );
 }

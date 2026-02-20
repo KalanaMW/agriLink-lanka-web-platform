@@ -82,26 +82,48 @@ export default function CreateProduct() {
     e.preventDefault();
     setError('');
     setSuccess('');
+
+    // Validate required fields
+    const trimmedName = formData.vegetableName.trim();
+    if (!trimmedName) {
+      setError('Vegetable name is required');
+      return;
+    }
+
+    if (!formData.grade || !formData.district) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    const price = Number(formData.pricePerKg);
+    const qty = Number(formData.availableQuantityKg);
+    if (isNaN(price) || price <= 0) {
+      setError('Price must be a positive number');
+      return;
+    }
+    if (isNaN(qty) || qty <= 0) {
+      setError('Quantity must be a positive number');
+      return;
+    }
+
+    if (!formData.harvestDate) {
+      setError('Harvest date is required');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Validate required fields
-      if (!formData.vegetableName || !formData.pricePerKg || !formData.availableQuantityKg || !formData.harvestDate) {
-        setError('Please fill in all required fields');
-        setIsLoading(false);
-        return;
-      }
-
       // Create FormData for multipart upload
       const data = new FormData();
-      data.append('vegetableName', formData.vegetableName);
-      if (formData.variety) data.append('variety', formData.variety);
+      data.append('vegetableName', trimmedName);
+      if (formData.variety?.trim()) data.append('variety', formData.variety.trim());
       data.append('grade', formData.grade);
       data.append('pricePerKg', formData.pricePerKg);
       data.append('availableQuantityKg', formData.availableQuantityKg);
       data.append('harvestDate', formData.harvestDate);
       data.append('district', formData.district);
-      if (formData.description) data.append('description', formData.description);
+      if (formData.description?.trim()) data.append('description', formData.description.trim());
       data.append('isExportReady', formData.isExportReady.toString());
       data.append('isOrganic', formData.isOrganic.toString());
       
@@ -175,7 +197,8 @@ export default function CreateProduct() {
                       value={formData.vegetableName}
                       onChange={handleChange}
                       placeholder="e.g., Tomato, Carrot, Cabbage"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                      maxLength={100}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                       required
                     />
                   </div>
@@ -190,7 +213,8 @@ export default function CreateProduct() {
                       value={formData.variety}
                       onChange={handleChange}
                       placeholder="e.g., Cherry, Roma, Beefsteak"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                      maxLength={100}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     />
                   </div>
 
@@ -202,7 +226,7 @@ export default function CreateProduct() {
                       name="grade"
                       value={formData.grade}
                       onChange={handleChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                       required
                     >
                       {grades.map(grade => (
@@ -227,7 +251,7 @@ export default function CreateProduct() {
                       name="district"
                       value={formData.district}
                       onChange={handleChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                       required
                     >
                       <option value="">Select District</option>
@@ -252,10 +276,10 @@ export default function CreateProduct() {
                       name="pricePerKg"
                       value={formData.pricePerKg}
                       onChange={handleChange}
-                      min="0"
+                      min="0.01"
                       step="0.01"
                       placeholder="0.00"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                       required
                     />
                   </div>
@@ -269,10 +293,10 @@ export default function CreateProduct() {
                       name="availableQuantityKg"
                       value={formData.availableQuantityKg}
                       onChange={handleChange}
-                      min="0"
+                      min="0.01"
                       step="0.01"
                       placeholder="0.00"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                       required
                     />
                   </div>
@@ -286,7 +310,7 @@ export default function CreateProduct() {
                       name="harvestDate"
                       value={formData.harvestDate}
                       onChange={handleChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                       required
                     />
                   </div>
@@ -303,8 +327,9 @@ export default function CreateProduct() {
                   value={formData.description}
                   onChange={handleChange}
                   rows={4}
+                  maxLength={1000}
                   placeholder="Describe your product, growing conditions, special features..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                 />
               </div>
 
@@ -352,7 +377,7 @@ export default function CreateProduct() {
                       type="file"
                       accept="image/jpeg,image/jpg,image/png,image/webp"
                       onChange={handleImageChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     />
                     <p className="mt-1 text-xs text-gray-500">Max size: 5MB. Formats: JPEG, PNG, WebP</p>
                     {productImage && (
@@ -368,7 +393,7 @@ export default function CreateProduct() {
                       type="file"
                       accept="image/jpeg,image/jpg,image/png,application/pdf"
                       onChange={handleCertificationChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     />
                     <p className="mt-1 text-xs text-gray-500">Max size: 5MB. Formats: PDF, JPEG, PNG</p>
                     {certificationDocument && (
