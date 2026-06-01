@@ -11,6 +11,7 @@ import { Order, Product } from '@/types';
 import { formatCurrency, formatDate, getImageUrl } from '@/lib/utils';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import SendReportModal from '@/components/ui/SendReportModal';
+import StripeCheckoutModal from '@/components/ui/StripeCheckoutModal';
 
 const STATUS_COLORS: Record<string, string> = {
   Pending: 'bg-yellow-100 text-yellow-800',
@@ -39,6 +40,7 @@ function OrdersContent() {
   const [sendingReport, setSendingReport] = useState(false);
   const [reportStatus, setReportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [stripeOrder, setStripeOrder] = useState<Order | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     open: boolean;
     title: string;
@@ -219,27 +221,21 @@ function OrdersContent() {
     });
   };
 
-  const handleConfirmPayment = (orderId: number) => {
-    setConfirmModal({
-      open: true,
-      title: 'Confirm Payment',
-      message: 'Confirm that you have completed the payment for this order?',
-      variant: 'success',
-      confirmLabel: 'Confirm Payment',
-      onConfirm: async () => {
-        closeConfirmModal();
-        try {
-          setProcessingId(orderId);
-          await orderService.confirmPayment(orderId);
-          setSelectedOrder(null);
-          await fetchOrders();
-        } catch (err: any) {
-          alert(err.response?.data?.message || 'Failed to confirm payment.');
-        } finally {
-          setProcessingId(null);
-        }
-      },
-    });
+  const handleConfirmPayment = (order: Order) => {
+    setStripeOrder(order);
+  };
+
+  const handleStripeSuccess = async (orderId: number) => {
+    try {
+      setProcessingId(orderId);
+      await orderService.confirmPayment(orderId);
+      setSelectedOrder(null);
+      await fetchOrders();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Payment recorded but DB update failed.');
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   const handleStatusUpdate = async (orderId: number, newStatus: string) => {
@@ -560,11 +556,14 @@ function OrdersContent() {
                   {/* Exporter can confirm payment only after farmer accepts */}
                   {user?.role === 'Exporter' && selectedOrder.paymentStatus === 'Pending' && ['Confirmed', 'Processing', 'Shipped'].includes(selectedOrder.status) && (
                     <button
-                      onClick={() => handleConfirmPayment(selectedOrder.id)}
+                      onClick={() => handleConfirmPayment(selectedOrder)}
                       disabled={processingId === selectedOrder.id}
-                      className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+                      className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-indigo-700 transition disabled:opacity-50 flex items-center gap-2"
                     >
-                      {processingId === selectedOrder.id ? 'Processing...' : 'Confirm Payment'}
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                      </svg>
+                      {processingId === selectedOrder.id ? 'Processing...' : 'Pay with Stripe'}
                     </button>
                   )}
 
@@ -619,6 +618,11 @@ function OrdersContent() {
           sending={sendingReport}
           onClose={() => setReportModalOpen(false)}
           onSend={handleSendReport}
+        />
+        <StripeCheckoutModal
+          order={stripeOrder}
+          onSuccess={() => stripeOrder && handleStripeSuccess(stripeOrder.id)}
+          onClose={() => setStripeOrder(null)}
         />
       </PageTransition>
     </ProtectedRoute>

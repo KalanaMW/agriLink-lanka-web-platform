@@ -9,13 +9,16 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@stripe/react-stripe-js": "^6.5.0",
+    "@stripe/stripe-js": "^9.7.0",
     "axios": "^1.13.1",
     "framer-motion": "^12.23.25",
     "jose": "^6.2.3",
     "next": "^15.5.4",
     "nodemailer": "^8.0.8",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "stripe": "^22.2.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
