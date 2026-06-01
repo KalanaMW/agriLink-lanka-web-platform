@@ -60,8 +60,9 @@ export default function Login() {
                     router.push('/dashboard');
                 }
             }, 1000);
-        } catch (err: any) {
-            const errorMessage = err.response?.data?.message || 'Login failed. Please check your credentials.';
+        } catch (err: unknown) {
+            const e = err as { response?: { data?: { message?: string } } };
+            const errorMessage = e.response?.data?.message || 'Login failed. Please check your credentials.';
             setError(errorMessage);
         } finally {
             setIsLoading(false);
