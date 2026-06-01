@@ -10,7 +10,7 @@
 
 ### Terminal 1: Start Backend API
 ```bash
-cd backend/AgriLink.API
+cd AgriLink.API
 dotnet run
 ```
 The API will start on: `http://localhost:5189`

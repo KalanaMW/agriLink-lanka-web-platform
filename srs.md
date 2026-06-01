@@ -106,7 +106,7 @@ Sri Lankan farmers often have limited direct access to exporters and export mark
 ## 1.5 References
 - [QUICKSTART.md](QUICKSTART.md)
 - [backend/API_DOCUMENTATION.md](backend/API_DOCUMENTATION.md)
-- Backend source: controllers, services, and models under `backend/AgriLink.API`
+- Backend source: controllers, services, and models under `AgriLink.API`
 
 ---
 

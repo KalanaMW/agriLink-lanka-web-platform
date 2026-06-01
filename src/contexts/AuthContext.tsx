@@ -10,6 +10,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<{ user: User; token: string }>;
+  register: (data: import('@/types').RegisterDto) => Promise<{ user: User; token: string }>;
   logout: () => void;
   updateUser: (user: User) => void;
 }
@@ -44,6 +45,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return response;
   };
 
+  const register = async (data: import('@/types').RegisterDto) => {
+    const response = await authService.register(data);
+    setUser(response.user);
+    return response;
+  };
+
   const logout = () => {
     removeToken();
     setUser(null);
@@ -61,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         login,
+        register,
         logout,
         updateUser,
       }}

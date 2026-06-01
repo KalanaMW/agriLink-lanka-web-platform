@@ -60,13 +60,13 @@ Expected response:
 **Cause**: Backend is not running
 **Solution**: 
 ```bash
-cd backend/AgriLink.API
+cd AgriLink.API
 dotnet run
 ```
 
 #### Issue: "CORS Error" in browser console
 **Cause**: CORS not configured for your port
-**Solution**: Check `backend/AgriLink.API/Program.cs` includes your port
+**Solution**: Check `AgriLink.API/Program.cs` includes your port
 
 #### Issue: "401 Unauthorized" or "Invalid credentials"
 **Cause**: Password hashing mismatch
@@ -128,7 +128,7 @@ npm install
 # In PostgreSQL: DROP DATABASE agrilink_db; CREATE DATABASE agrilink_db;
 
 # 4. Start backend
-cd backend/AgriLink.API
+cd AgriLink.API
 dotnet run
 
 # 5. In another terminal, start frontend

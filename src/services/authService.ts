@@ -61,4 +61,9 @@ export const authService = {
     const response = await api.get<User[]>(`/auth/users${params}`);
     return response.data;
   },
+
+  async toggleUserStatus(userId: number): Promise<{ message: string; isActive: boolean }> {
+    const response = await api.put<{ message: string; isActive: boolean }>(`/auth/users/${userId}/toggle-status`);
+    return response.data;
+  },
 };

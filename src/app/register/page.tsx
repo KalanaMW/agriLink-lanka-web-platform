@@ -2,11 +2,12 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation';
-import { authService } from '@/services/authService';
+import { useAuth } from '@/contexts/AuthContext';
 import { RegisterDto } from '@/types';
 
 export default function Register() {
   const router = useRouter();
+  const { register } = useAuth();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -20,13 +21,23 @@ export default function Register() {
   });
   const [doc, setDoc] = useState<File | null>(null);
   const [error, setError] = useState('');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+    const updated = { ...formData, [name]: value };
+    setFormData(updated);
+    // Real-time confirm password check
+    if (name === 'confirmPassword' || name === 'password') {
+      const pw = name === 'password' ? value : updated.password;
+      const cpw = name === 'confirmPassword' ? value : updated.confirmPassword;
+      if (cpw && pw !== cpw) {
+        setConfirmPasswordError('Passwords do not match');
+      } else {
+        setConfirmPasswordError('');
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,10 +103,15 @@ export default function Register() {
         farmerIdProof: doc || undefined,
       };
 
-      await authService.register(registerData);
-      router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      const result = await register(registerData);
+      // Role-based redirect after auto-login
+      const role = result.user.role;
+      if (role === 'Farmer') router.push('/dashboard/farmer');
+      else if (role === 'Exporter') router.push('/dashboard/exporter');
+      else router.push('/dashboard');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setError(e.response?.data?.message || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -159,8 +175,11 @@ export default function Register() {
               value={formData.confirmPassword}
               onChange={handleChange}
               required 
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition" 
+              className={`w-full px-4 py-2.5 border rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 transition ${confirmPasswordError ? 'border-red-400 focus:ring-red-400' : 'border-gray-300 focus:ring-green-500 focus:border-green-500'}`}
             />
+            {confirmPasswordError && (
+              <p className="mt-1 text-xs text-red-600">{confirmPasswordError}</p>
+            )}
           </div>
           <div>
             <label className="block text-gray-700 mb-1">Role</label>

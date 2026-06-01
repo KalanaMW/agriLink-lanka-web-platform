@@ -33,6 +33,7 @@ export default function Navbar() {
                             <>
                                 <Link href="/dashboard" className="hover:text-green-200 transition font-medium">Dashboard</Link>
                                 <Link href="/orders" className="hover:text-green-200 transition font-medium">Orders</Link>
+                                <Link href="/analytics" className="hover:text-green-200 transition font-medium">Analytics</Link>
                             </>
                         )}
                     </div>
@@ -102,6 +103,7 @@ export default function Navbar() {
                             <>
                                 <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} className="block py-2 hover:text-green-200 transition font-medium">Dashboard</Link>
                                 <Link href="/orders" onClick={() => setMobileMenuOpen(false)} className="block py-2 hover:text-green-200 transition font-medium">Orders</Link>
+                                <Link href="/analytics" onClick={() => setMobileMenuOpen(false)} className="block py-2 hover:text-green-200 transition font-medium">Analytics</Link>
                                 <Link href="/profile" onClick={() => setMobileMenuOpen(false)} className="block py-2 hover:text-green-200 transition font-medium">Profile</Link>
                             </>
                         )}

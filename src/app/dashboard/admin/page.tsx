@@ -6,11 +6,13 @@ import { useEffect, useState } from 'react';
 import { productService } from '@/services/productService';
 import { authService } from '@/services/authService';
 import { dashboardService } from '@/services/dashboardService';
-import { Product, User, AdminDashboard as AdminDashboardType } from '@/types';
+import { Product, User, Order, AdminDashboard as AdminDashboardType } from '@/types';
+import { orderService } from '@/services/orderService';
 import { getImageUrl, formatCurrency, formatDate } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fadeInUp, staggerContainer } from '@/components/animations/PageTransition';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import SendReportModal from '@/components/ui/SendReportModal';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -22,8 +24,14 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [verifyingId, setVerifyingId] = useState<number | null>(null);
+  const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [activeTab, setActiveTab] = useState<'products' | 'exporters' | 'users'>('products');
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
+  const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
+  const [sendingReport, setSendingReport] = useState(false);
+  const [reportStatus, setReportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'products' | 'exporters' | 'orders' | 'users'>('products');
   const [userRoleFilter, setUserRoleFilter] = useState<string>('');
   const [confirmModal, setConfirmModal] = useState<{
     open: boolean;
@@ -37,16 +45,18 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [all, pending, exporters, dashboard, users] = await Promise.all([
+      const [all, pending, exporters, dashboard, users, orders] = await Promise.all([
         productService.getProducts({}),
         productService.getPendingProducts(),
         authService.getUnverifiedExporters(),
         dashboardService.getAdminDashboard().catch(() => null),
         authService.getAllUsers().catch(() => []),
+        orderService.getOrders().catch(() => []),
       ]);
       setAllProducts(Array.isArray(all) ? all : (all.products || []));
       setPendingProducts(pending);
       setUnverifiedExporters(exporters);
+      setAllOrders(orders);
       if (dashboard) setDashboardData(dashboard);
       setAllUsers(users);
     } catch (error) {
@@ -61,6 +71,60 @@ export default function AdminDashboard() {
   }, []);
 
   const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, open: false }));
+
+  const handleSendReport = async (dateFrom: string, dateTo: string) => {
+    setReportModalOpen(false);
+    setSendingReport(true);
+    setReportStatus(null);
+    try {
+      const token = localStorage.getItem('token');
+      const from = new Date(dateFrom); from.setHours(0, 0, 0, 0);
+      const to = new Date(dateTo); to.setHours(23, 59, 59, 999);
+      const filteredOrders = allOrders.filter(o => {
+        const d = new Date(o.createdAt);
+        return d >= from && d <= to;
+      });
+      const filteredRevenue = filteredOrders
+        .filter(o => o.status === 'Delivered')
+        .reduce((s, o) => s + o.totalAmount, 0);
+      const response = await fetch('/api/send-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          role: 'Admin',
+          dateFrom,
+          dateTo,
+          totalUsers: dashboardData?.totalUsers ?? 0,
+          totalFarmers: dashboardData?.totalFarmers ?? 0,
+          totalExporters: dashboardData?.totalExporters ?? 0,
+          unverifiedExporters: dashboardData?.unverifiedExporters ?? 0,
+          totalProducts: dashboardData?.totalProducts ?? 0,
+          pendingProducts: dashboardData?.pendingProducts ?? 0,
+          totalOrders: filteredOrders.length,
+          totalRevenue: filteredRevenue,
+          orders: filteredOrders.map((o) => ({
+            orderNumber: o.orderNumber,
+            exporterName: o.exporterName,
+            exporterEmail: o.exporterEmail,
+            totalAmount: o.totalAmount,
+            status: o.status,
+            paymentStatus: o.paymentStatus,
+            createdAt: o.createdAt,
+          })),
+          generatedAt: new Date().toISOString(),
+        }),
+      });
+      const data = await response.json();
+      setReportStatus(response.ok
+        ? { type: 'success', message: 'Report sent to agrilinklanka@gmail.com' }
+        : { type: 'error', message: data.error || 'Failed to send report.' });
+    } catch {
+      setReportStatus({ type: 'error', message: 'Network error. Could not send report.' });
+    } finally {
+      setSendingReport(false);
+      setTimeout(() => setReportStatus(null), 5000);
+    }
+  };
 
   const handleApprove = (id: number) => {
     setConfirmModal({
@@ -133,6 +197,31 @@ export default function AdminDashboard() {
     });
   };
 
+  const handleToggleUserStatus = (userId: number, isActive: boolean, name: string) => {
+    const action = isActive ? 'deactivate' : 'activate';
+    const actionLabel = isActive ? 'Deactivate' : 'Activate';
+    setConfirmModal({
+      open: true,
+      title: `${actionLabel} User`,
+      message: `Are you sure you want to ${action} "${name}"? ${isActive ? 'They will no longer be able to log in.' : 'They will regain access to their account.'}`,
+      variant: isActive ? 'danger' : 'success',
+      confirmLabel: actionLabel,
+      onConfirm: async () => {
+        closeConfirmModal();
+        try {
+          setTogglingUserId(userId);
+          await authService.toggleUserStatus(userId);
+          await fetchData();
+        } catch (error) {
+          console.error('Failed to toggle user status:', error);
+          alert('Failed to update user status. Please try again.');
+        } finally {
+          setTogglingUserId(null);
+        }
+      },
+    });
+  };
+
   const availableProducts = allProducts?.filter(p => p.status === 'Available') || [];
   const filteredUsers = userRoleFilter
     ? allUsers.filter(u => u.role === userRoleFilter)
@@ -143,9 +232,29 @@ export default function AdminDashboard() {
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-            <p className="mt-2 text-gray-600">Welcome back, {user?.fullName}!</p>
+          <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+              <p className="mt-2 text-gray-600">Welcome back, {user?.fullName}!</p>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <button
+                onClick={() => setReportModalOpen(true)}
+                disabled={sendingReport || loading}
+                className="flex items-center gap-2 bg-green-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {sendingReport ? (
+                  <><svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Sending...</>
+                ) : (
+                  <><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> Send Report</>  
+                )}
+              </button>
+              {reportStatus && (
+                <p className={`text-sm font-medium ${reportStatus.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                  {reportStatus.type === 'success' ? '✓' : '✗'} {reportStatus.message}
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Stats Cards */}
@@ -189,6 +298,14 @@ export default function AdminDashboard() {
               }`}
             >
               Exporter Verification ({unverifiedExporters?.length || 0} pending)
+            </button>
+            <button
+              onClick={() => setActiveTab('orders')}
+              className={`px-6 py-3 font-semibold text-sm border-b-2 transition ${
+                activeTab === 'orders' ? 'border-green-600 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Orders ({allOrders?.length || 0})
             </button>
             <button
               onClick={() => setActiveTab('users')}
@@ -478,6 +595,119 @@ export default function AdminDashboard() {
           </>
           )}
 
+          {activeTab === 'orders' && (
+          <>
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">All Orders ({allOrders?.length || 0})</h2>
+            {loading ? (
+              <div className="text-center py-12 text-gray-500">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+                <p className="mt-4">Loading orders...</p>
+              </div>
+            ) : allOrders.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 mx-auto mb-4 text-gray-400">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+                </svg>
+                <p className="text-lg">No orders yet</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order #</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Exporter</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {allOrders.map((order) => (
+                      <tr key={order.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{order.orderNumber}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          <div>{order.exporterName}</div>
+                          <div className="text-xs text-gray-400">{order.exporterEmail}</div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{order.items?.length ?? 0} item{(order.items?.length ?? 0) !== 1 ? 's' : ''}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-green-600">{formatCurrency(order.totalAmount)}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                            order.paymentStatus === 'Completed' ? 'bg-green-100 text-green-800' :
+                            order.paymentStatus === 'Failed' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {order.paymentStatus}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                            order.status === 'Delivered' ? 'bg-green-100 text-green-800' :
+                            order.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                            order.status === 'Shipped' ? 'bg-indigo-100 text-indigo-800' :
+                            order.status === 'Processing' ? 'bg-purple-100 text-purple-800' :
+                            order.status === 'Confirmed' ? 'bg-blue-100 text-blue-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {order.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-500">{formatDate(order.createdAt)}</td>
+                        <td className="px-4 py-3">
+                          {!['Delivered', 'Cancelled'].includes(order.status) && (
+                            <select
+                              disabled={updatingOrderId === order.id}
+                              defaultValue=""
+                              onChange={async (e) => {
+                                const newStatus = e.target.value;
+                                if (!newStatus) return;
+                                setConfirmModal({
+                                  open: true,
+                                  title: 'Update Order Status',
+                                  message: `Change order ${order.orderNumber} status to "${newStatus}"?`,
+                                  variant: 'warning',
+                                  confirmLabel: 'Update',
+                                  onConfirm: async () => {
+                                    closeConfirmModal();
+                                    try {
+                                      setUpdatingOrderId(order.id);
+                                      await orderService.updateOrderStatus(order.id, { status: newStatus });
+                                      await fetchData();
+                                    } catch {
+                                      alert('Failed to update order status.');
+                                    } finally {
+                                      setUpdatingOrderId(null);
+                                    }
+                                  },
+                                });
+                                e.target.value = '';
+                              }}
+                              className="text-xs px-2 py-1 border border-gray-300 rounded bg-white text-gray-900 disabled:opacity-50"
+                            >
+                              <option value="">Update status...</option>
+                              {order.status === 'Pending' && <option value="Confirmed">Confirm</option>}
+                              {order.status === 'Confirmed' && <option value="Processing">Processing</option>}
+                              {order.status === 'Processing' && <option value="Shipped">Ship</option>}
+                              {order.status === 'Shipped' && <option value="Delivered">Deliver</option>}
+                              {!['Delivered', 'Cancelled'].includes(order.status) && <option value="Cancelled">Cancel</option>}
+                            </select>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          </>
+          )}
+
           {activeTab === 'users' && (
           <>
           {/* All Registered Users Section */}
@@ -521,8 +751,10 @@ export default function AdminDashboard() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">District</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Verified</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registered</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -568,8 +800,28 @@ export default function AdminDashboard() {
                             {u.isVerified ? 'Verified' : 'Unverified'}
                           </span>
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            u.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {u.isActive ? 'Active' : 'Deactivated'}
+                          </span>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {formatDate(u.createdAt)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <button
+                            onClick={() => handleToggleUserStatus(u.id, u.isActive, u.fullName)}
+                            disabled={togglingUserId === u.id}
+                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition disabled:opacity-50 ${
+                              u.isActive
+                                ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                                : 'bg-green-100 text-green-700 hover:bg-green-200'
+                            }`}
+                          >
+                            {togglingUserId === u.id ? '...' : u.isActive ? 'Deactivate' : 'Activate'}
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -585,7 +837,7 @@ export default function AdminDashboard() {
       </div>
 
       {selectedProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
@@ -717,6 +969,14 @@ export default function AdminDashboard() {
         confirmLabel={confirmModal.confirmLabel}
         onConfirm={confirmModal.onConfirm}
         onCancel={closeConfirmModal}
+      />
+      <SendReportModal
+        open={reportModalOpen}
+        title="Send Platform Report"
+        description="Platform stats + orders in the selected date range will be emailed to agrilinklanka@gmail.com."
+        sending={sendingReport}
+        onClose={() => setReportModalOpen(false)}
+        onSend={handleSendReport}
       />
     </RoleProtectedRoute>
   );

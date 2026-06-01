@@ -10,6 +10,8 @@ import { productService } from '@/services/productService';
 import { Order, Product } from '@/types';
 import { formatCurrency, formatDate, getImageUrl } from '@/lib/utils';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import SendReportModal from '@/components/ui/SendReportModal';
+import StripeCheckoutModal from '@/components/ui/StripeCheckoutModal';
 
 const STATUS_COLORS: Record<string, string> = {
   Pending: 'bg-yellow-100 text-yellow-800',
@@ -35,6 +37,10 @@ function OrdersContent() {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [processingId, setProcessingId] = useState<number | null>(null);
+  const [sendingReport, setSendingReport] = useState(false);
+  const [reportStatus, setReportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [stripeOrder, setStripeOrder] = useState<Order | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     open: boolean;
     title: string;
@@ -84,6 +90,74 @@ function OrdersContent() {
       if (qty) setOrderQuantity(Math.min(100, Number(qty)).toString());
     } catch {
       console.error('Failed to load product for order');
+    }
+  };
+
+  const handleSendReport = async (dateFrom: string, dateTo: string) => {
+    setReportModalOpen(false);
+    setSendingReport(true);
+    setReportStatus(null);
+    try {
+      const token = localStorage.getItem('token');
+      const role = user?.role;
+      const from = new Date(dateFrom); from.setHours(0, 0, 0, 0);
+      const to = new Date(dateTo); to.setHours(23, 59, 59, 999);
+      const filteredOrders = orders.filter(o => {
+        const d = new Date(o.createdAt);
+        return d >= from && d <= to;
+      });
+      const deliveredRevenue = filteredOrders
+        .filter(o => o.status === 'Delivered')
+        .reduce((s, o) => s + o.totalAmount, 0);
+      const body: Record<string, unknown> = {
+        role,
+        dateFrom,
+        dateTo,
+        generatedAt: new Date().toISOString(),
+        orders: filteredOrders.map(o => ({
+          orderNumber: o.orderNumber,
+          exporterName: o.exporterName ?? '',
+          exporterEmail: o.exporterEmail ?? '',
+          farmerName: (o as unknown as { farmerName?: string }).farmerName ?? '',
+          totalAmount: o.totalAmount,
+          status: o.status,
+          paymentStatus: o.paymentStatus,
+          createdAt: o.createdAt,
+        })),
+        ...(role === 'Farmer' ? {
+          farmerName: user?.fullName,
+          farmerRevenue: deliveredRevenue,
+          productCount: 0, totalStock: 0, avgPricePerKg: 0,
+          organicCount: 0, exportReadyCount: 0, products: [],
+        } : {}),
+        ...(role === 'Exporter' ? {
+          exporterName: user?.fullName,
+          exporterCompany: user?.companyName,
+          totalSpent: deliveredRevenue,
+          completedOrders: filteredOrders.filter(o => o.status === 'Delivered').length,
+          pendingOrders: filteredOrders.filter(o => o.status === 'Pending' || o.status === 'Processing').length,
+        } : {}),
+        ...(role === 'Admin' ? {
+          totalOrders: filteredOrders.length,
+          totalRevenue: deliveredRevenue,
+          totalUsers: 0, totalFarmers: 0, totalExporters: 0, unverifiedExporters: 0,
+          totalProducts: 0, pendingProducts: 0,
+        } : {}),
+      };
+      const res = await fetch('/api/send-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      setReportStatus(res.ok
+        ? { type: 'success', message: 'Report sent to agrilinklanka@gmail.com' }
+        : { type: 'error', message: data.error || 'Failed to send.' });
+    } catch {
+      setReportStatus({ type: 'error', message: 'Network error.' });
+    } finally {
+      setSendingReport(false);
+      setTimeout(() => setReportStatus(null), 5000);
     }
   };
 
@@ -147,27 +221,21 @@ function OrdersContent() {
     });
   };
 
-  const handleConfirmPayment = (orderId: number) => {
-    setConfirmModal({
-      open: true,
-      title: 'Confirm Payment',
-      message: 'Confirm that you have completed the payment for this order?',
-      variant: 'success',
-      confirmLabel: 'Confirm Payment',
-      onConfirm: async () => {
-        closeConfirmModal();
-        try {
-          setProcessingId(orderId);
-          await orderService.confirmPayment(orderId);
-          setSelectedOrder(null);
-          await fetchOrders();
-        } catch (err: any) {
-          alert(err.response?.data?.message || 'Failed to confirm payment.');
-        } finally {
-          setProcessingId(null);
-        }
-      },
-    });
+  const handleConfirmPayment = (order: Order) => {
+    setStripeOrder(order);
+  };
+
+  const handleStripeSuccess = async (orderId: number) => {
+    try {
+      setProcessingId(orderId);
+      await orderService.confirmPayment(orderId);
+      setSelectedOrder(null);
+      await fetchOrders();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Payment recorded but DB update failed.');
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   const handleStatusUpdate = async (orderId: number, newStatus: string) => {
@@ -208,14 +276,31 @@ function OrdersContent() {
                    'Manage all platform orders'}
                 </p>
               </div>
-              {user?.role === 'Exporter' && (
-                <button
-                  onClick={() => router.push('/products')}
-                  className="bg-green-600 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-green-700 transition"
-                >
-                  Browse Products
-                </button>
-              )}
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex gap-2 flex-wrap justify-end">
+                  {user?.role === 'Exporter' && (
+                    <button onClick={() => router.push('/products')} className="bg-green-600 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-green-700 transition">
+                      Browse Products
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setReportModalOpen(true)}
+                    disabled={sendingReport}
+                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg font-semibold text-sm hover:bg-blue-700 transition disabled:opacity-50"
+                  >
+                    {sendingReport ? (
+                      <><svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Sending...</>
+                    ) : (
+                      <><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>Send Report</>
+                    )}
+                  </button>
+                </div>
+                {reportStatus && (
+                  <p className={`text-sm font-medium ${reportStatus.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                    {reportStatus.type === 'success' ? '✓' : '✗'} {reportStatus.message}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Create Order Form */}
@@ -373,7 +458,7 @@ function OrdersContent() {
 
         {/* Order Detail Modal */}
         {selectedOrder && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedOrder(null)}>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedOrder(null)}>
             <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className="p-6">
                 <div className="flex justify-between items-start mb-6">
@@ -468,19 +553,22 @@ function OrdersContent() {
 
                 {/* Actions */}
                 <div className="flex flex-wrap gap-3">
-                  {/* Exporter can confirm payment on pending orders */}
-                  {user?.role === 'Exporter' && selectedOrder.paymentStatus === 'Pending' && selectedOrder.status !== 'Cancelled' && (
+                  {/* Exporter can confirm payment only after farmer accepts */}
+                  {user?.role === 'Exporter' && selectedOrder.paymentStatus === 'Pending' && ['Confirmed', 'Processing', 'Shipped'].includes(selectedOrder.status) && (
                     <button
-                      onClick={() => handleConfirmPayment(selectedOrder.id)}
+                      onClick={() => handleConfirmPayment(selectedOrder)}
                       disabled={processingId === selectedOrder.id}
-                      className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+                      className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-indigo-700 transition disabled:opacity-50 flex items-center gap-2"
                     >
-                      {processingId === selectedOrder.id ? 'Processing...' : 'Confirm Payment'}
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                      </svg>
+                      {processingId === selectedOrder.id ? 'Processing...' : 'Pay with Stripe'}
                     </button>
                   )}
 
-                  {/* Exporter can cancel pending/confirmed orders */}
-                  {user?.role === 'Exporter' && (selectedOrder.status === 'Pending' || selectedOrder.status === 'Confirmed') && (
+                  {/* Exporter can only cancel pending orders (before farmer accepts) */}
+                  {user?.role === 'Exporter' && selectedOrder.status === 'Pending' && (
                     <button
                       onClick={() => handleCancelOrder(selectedOrder.id)}
                       disabled={processingId === selectedOrder.id}
@@ -522,6 +610,19 @@ function OrdersContent() {
           confirmLabel={confirmModal.confirmLabel}
           onConfirm={confirmModal.onConfirm}
           onCancel={closeConfirmModal}
+        />
+        <SendReportModal
+          open={reportModalOpen}
+          title="Send Orders Report"
+          description="Orders in the selected date range will be emailed to agrilinklanka@gmail.com."
+          sending={sendingReport}
+          onClose={() => setReportModalOpen(false)}
+          onSend={handleSendReport}
+        />
+        <StripeCheckoutModal
+          order={stripeOrder}
+          onSuccess={() => stripeOrder && handleStripeSuccess(stripeOrder.id)}
+          onClose={() => setStripeOrder(null)}
         />
       </PageTransition>
     </ProtectedRoute>
