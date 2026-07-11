@@ -1,24 +1,31 @@
+using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
 namespace AgriLink.API.Services;
 
 public class CloudinaryService : ICloudinaryService
 {
     private readonly ILogger<CloudinaryService> _logger;
-    private readonly IWebHostEnvironment _environment;
-    private readonly string _uploadFolder;
+    private readonly Cloudinary _cloudinary;
 
-    public CloudinaryService(ILogger<CloudinaryService> logger, IWebHostEnvironment environment)
+    public CloudinaryService(ILogger<CloudinaryService> logger, IConfiguration configuration)
     {
         _logger = logger;
-        _environment = environment;
         
-        // Create uploads folder in wwwroot
-        _uploadFolder = Path.Combine(_environment.WebRootPath ?? _environment.ContentRootPath, "uploads");
-        
-        if (!Directory.Exists(_uploadFolder))
+        var cloudName = configuration["Cloudinary:CloudName"];
+        var apiKey = configuration["Cloudinary:ApiKey"];
+        var apiSecret = configuration["Cloudinary:ApiSecret"];
+
+        if (string.IsNullOrEmpty(cloudName) || string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(apiSecret))
         {
-            Directory.CreateDirectory(_uploadFolder);
-            _logger.LogInformation("Created uploads directory at: {Path}", _uploadFolder);
+            _logger.LogWarning("Cloudinary settings are missing in appsettings.json. Image uploads may fail.");
         }
+
+        var account = new Account(cloudName, apiKey, apiSecret);
+        _cloudinary = new Cloudinary(account);
+        _cloudinary.Api.Secure = true;
     }
 
     public async Task<string> UploadImageAsync(IFormFile file, string folderName)
@@ -43,63 +50,97 @@ public class CloudinaryService : ICloudinaryService
 
         try
         {
-            // Create folder if it doesn't exist
-            var folderPath = Path.Combine(_uploadFolder, folderName);
-            if (!Directory.Exists(folderPath))
-            {
-                Directory.CreateDirectory(folderPath);
-            }
-
-            // Generate unique filename
-            var fileExtension = Path.GetExtension(file.FileName);
-            var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
-            var filePath = Path.Combine(folderPath, uniqueFileName);
-
-            // Save file to disk
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream);
-            }
-
-            // Return relative URL path
-            var relativeUrl = $"/uploads/{folderName}/{uniqueFileName}";
-            _logger.LogInformation("File uploaded successfully to: {Path}", relativeUrl);
+            using var stream = file.OpenReadStream();
             
-            return relativeUrl;
+            var isImage = file.ContentType.ToLower().StartsWith("image/");
+            
+            if (isImage)
+            {
+                var uploadParams = new ImageUploadParams()
+                {
+                    File = new FileDescription(file.FileName, stream),
+                    Folder = folderName
+                };
+                var uploadResult = await _cloudinary.UploadAsync(uploadParams);
+                if (uploadResult.Error != null)
+                {
+                    _logger.LogError("Cloudinary image upload error: {Error}", uploadResult.Error.Message);
+                    throw new Exception($"Cloudinary upload failed: {uploadResult.Error.Message}");
+                }
+                return uploadResult.SecureUrl.ToString();
+            }
+            else
+            {
+                var uploadParams = new RawUploadParams()
+                {
+                    File = new FileDescription(file.FileName, stream),
+                    Folder = folderName
+                };
+                var uploadResult = await _cloudinary.UploadAsync(uploadParams);
+                if (uploadResult.Error != null)
+                {
+                    _logger.LogError("Cloudinary document upload error: {Error}", uploadResult.Error.Message);
+                    throw new Exception($"Cloudinary upload failed: {uploadResult.Error.Message}");
+                }
+                return uploadResult.SecureUrl.ToString();
+            }
+
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error uploading file locally");
+            _logger.LogError(ex, "Error uploading file to Cloudinary");
             throw new Exception("Failed to upload file. Please try again.", ex);
         }
     }
 
-    public Task<bool> DeleteImageAsync(string filePath)
+    public async Task<bool> DeleteImageAsync(string fileUrl)
     {
-        if (string.IsNullOrEmpty(filePath))
+        if (string.IsNullOrEmpty(fileUrl))
         {
-            return Task.FromResult(false);
+            return false;
         }
 
         try
         {
-            // Convert relative URL to absolute file path
-            var fileName = filePath.Replace("/uploads/", "").Replace("/", Path.DirectorySeparatorChar.ToString());
-            var absolutePath = Path.Combine(_uploadFolder, fileName);
-
-            if (File.Exists(absolutePath))
+            // Extract public ID from URL
+            // Example URL: https://res.cloudinary.com/dgyqfax25/image/upload/v1234567890/folder/filename.jpg
+            var uri = new Uri(fileUrl);
+            var segments = uri.Segments;
+            
+            // Find the 'upload' segment index
+            int uploadIndex = -1;
+            for (int i = 0; i < segments.Length; i++)
             {
-                File.Delete(absolutePath);
-                _logger.LogInformation("File deleted successfully: {Path}", absolutePath);
-                return Task.FromResult(true);
+                if (segments[i].Trim('/') == "upload")
+                {
+                    uploadIndex = i;
+                    break;
+                }
+            }
+
+            if (uploadIndex != -1 && uploadIndex + 2 < segments.Length)
+            {
+                // The public ID includes the folder and the filename without extension
+                // Skip the version segment (uploadIndex + 1)
+                var publicIdWithExtension = string.Join("", segments.Skip(uploadIndex + 2)).Trim('/');
+                var publicId = Path.ChangeExtension(publicIdWithExtension, null); // Remove extension
+
+                var deletionParams = new DeletionParams(publicId);
+                var deletionResult = await _cloudinary.DestroyAsync(deletionParams);
+
+                if (deletionResult.Result == "ok")
+                {
+                    _logger.LogInformation("File deleted successfully from Cloudinary: {PublicId}", publicId);
+                    return true;
+                }
             }
             
-            return Task.FromResult(false);
+            return false;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting file");
-            return Task.FromResult(false);
+            _logger.LogError(ex, "Error deleting file from Cloudinary");
+            return false;
         }
     }
 }

@@ -47,12 +47,22 @@ export const authService = {
     window.location.href = '/login';
   },
 
-  async verifyExporter(userId: number): Promise<void> {
-    await api.put(`/auth/verify-exporter/${userId}`);
+  async verifyUser(userId: number): Promise<void> {
+    await api.put(`/auth/verify-user/${userId}`);
   },
 
-  async getUnverifiedExporters(): Promise<User[]> {
-    const response = await api.get<User[]>('/auth/unverified-exporters');
+  async getUnverifiedUsers(): Promise<User[]> {
+    const response = await api.get<User[]>('/auth/unverified-users');
+    return response.data;
+  },
+
+  async updateUser(userId: number, data: Partial<User>): Promise<{ message: string }> {
+    const response = await api.put<{ message: string }>(`/auth/users/${userId}`, data);
+    return response.data;
+  },
+
+  async deleteUser(userId: number): Promise<{ message: string }> {
+    const response = await api.delete<{ message: string }>(`/auth/users/${userId}`);
     return response.data;
   },
 

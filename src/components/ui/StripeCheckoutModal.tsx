@@ -16,7 +16,7 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 // ─── Inner form — renders ONLY the payment fields, no buttons ─────────────
 interface CheckoutFormProps {
   order: Order;
-  onSuccess: () => void;
+  onSuccess: (paymentIntentId: string) => void;
   onError: (msg: string) => void;
   onSubmittingChange: (v: boolean) => void;
 }
@@ -31,7 +31,7 @@ function CheckoutForm({ order, onSuccess, onError, onSubmittingChange }: Checkou
 
     onSubmittingChange(true);
     try {
-      const { error } = await stripe.confirmPayment({
+      const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: { return_url: window.location.href },
         redirect: 'if_required',
@@ -39,8 +39,8 @@ function CheckoutForm({ order, onSuccess, onError, onSubmittingChange }: Checkou
 
       if (error) {
         onError(error.message ?? 'Payment failed. Please try again.');
-      } else {
-        onSuccess();
+      } else if (paymentIntent) {
+        onSuccess(paymentIntent.id);
       }
     } finally {
       onSubmittingChange(false);
@@ -65,7 +65,7 @@ function CheckoutForm({ order, onSuccess, onError, onSubmittingChange }: Checkou
 // ─── Modal shell ───────────────────────────────────────────────────────────
 interface StripeCheckoutModalProps {
   order: Order | null;
-  onSuccess: () => void;
+  onSuccess: (paymentIntentId: string) => void;
   onClose: () => void;
 }
 
@@ -99,8 +99,8 @@ export default function StripeCheckoutModal({ order, onSuccess, onClose }: Strip
       .catch(err => setLoadError(err.message ?? 'Failed to initialise payment.'));
   }, [order]);
 
-  const handleSuccess = () => {
-    onSuccess();
+  const handleSuccess = (paymentIntentId: string) => {
+    onSuccess(paymentIntentId);
     onClose();
   };
 

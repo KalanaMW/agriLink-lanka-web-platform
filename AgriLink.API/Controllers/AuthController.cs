@@ -71,7 +71,7 @@ namespace AgriLink.API.Controllers
                 PhoneNumber = dto.PhoneNumber,
                 CompanyName = dto.CompanyName,
                 FarmerIdProofUrl = farmerIdProofUrl,
-                IsVerified = dto.Role == "Farmer", // Farmers auto-verified, Exporters need admin approval
+                IsVerified = dto.Role == "Admin", // Farmers and Exporters need admin approval
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
             };
@@ -191,8 +191,8 @@ namespace AgriLink.API.Controllers
         }
 
         [Authorize(Roles = "Admin")]
-        [HttpPut("verify-exporter/{userId}")]
-        public async Task<ActionResult> VerifyExporter(int userId)
+        [HttpPut("verify-user/{userId}")]
+        public async Task<ActionResult> VerifyUser(int userId)
         {
             var user = await _context.Users.FindAsync(userId);
 
@@ -201,9 +201,9 @@ namespace AgriLink.API.Controllers
                 return NotFound(new { message = "User not found" });
             }
 
-            if (user.Role != "Exporter")
+            if (user.Role == "Admin")
             {
-                return BadRequest(new { message = "User is not an exporter" });
+                return BadRequest(new { message = "Cannot verify an Admin" });
             }
 
             user.IsVerified = true;
@@ -211,15 +211,15 @@ namespace AgriLink.API.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Exporter verified successfully" });
+            return Ok(new { message = "User verified successfully" });
         }
 
         [Authorize(Roles = "Admin")]
-        [HttpGet("unverified-exporters")]
-        public async Task<ActionResult<List<UserDto>>> GetUnverifiedExporters()
+        [HttpGet("unverified-users")]
+        public async Task<ActionResult<List<UserDto>>> GetUnverifiedUsers()
         {
-            var exporters = await _context.Users
-                .Where(u => u.Role == "Exporter" && !u.IsVerified)
+            var users = await _context.Users
+                .Where(u => u.Role != "Admin" && !u.IsVerified)
                 .Select(u => new UserDto
                 {
                     Id = u.Id,
@@ -232,11 +232,12 @@ namespace AgriLink.API.Controllers
                     CompanyName = u.CompanyName,
                     IsVerified = u.IsVerified,
                     IsActive = u.IsActive,
+                    FarmerIdProofUrl = u.FarmerIdProofUrl,
                     CreatedAt = u.CreatedAt
                 })
                 .ToListAsync();
 
-            return Ok(exporters);
+            return Ok(users);
         }
 
         [Authorize(Roles = "Admin")]
@@ -270,6 +271,7 @@ namespace AgriLink.API.Controllers
                     IsVerified = u.IsVerified,
                     IsActive = u.IsActive,
                     ProfileImageUrl = u.ProfileImageUrl,
+                    FarmerIdProofUrl = u.FarmerIdProofUrl,
                     CreatedAt = u.CreatedAt
                 })
                 .ToListAsync();
@@ -300,6 +302,53 @@ namespace AgriLink.API.Controllers
 
             var action = user.IsActive ? "activated" : "deactivated";
             return Ok(new { message = $"User {action} successfully", isActive = user.IsActive });
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPut("users/{userId}")]
+        public async Task<ActionResult> UpdateUser(int userId, [FromBody] UserDto dto)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return NotFound(new { message = "User not found" });
+            }
+
+            if (user.Role == "Admin")
+            {
+                return BadRequest(new { message = "Cannot edit an Admin account" });
+            }
+
+            user.FullName = dto.FullName;
+            user.PhoneNumber = dto.PhoneNumber;
+            user.District = dto.District;
+            user.CompanyName = dto.CompanyName;
+            user.Address = dto.Address;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "User updated successfully" });
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpDelete("users/{userId}")]
+        public async Task<ActionResult> DeleteUser(int userId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return NotFound(new { message = "User not found" });
+            }
+
+            if (user.Role == "Admin")
+            {
+                return BadRequest(new { message = "Cannot delete an Admin account" });
+            }
+
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "User deleted successfully" });
         }
     }
 }

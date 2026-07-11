@@ -5,6 +5,7 @@ using AgriLink.API.Data;
 using AgriLink.API.Models;
 using AgriLink.API.DTOs;
 using System.Security.Claims;
+using Stripe;
 
 namespace AgriLink.API.Controllers;
 
@@ -15,11 +16,14 @@ public class OrdersController : ControllerBase
 {
     private readonly AgriLinkDbContext _context;
     private readonly ILogger<OrdersController> _logger;
+    private readonly IConfiguration _configuration;
 
-    public OrdersController(AgriLinkDbContext context, ILogger<OrdersController> logger)
+    public OrdersController(AgriLinkDbContext context, ILogger<OrdersController> logger, IConfiguration configuration)
     {
         _context = context;
         _logger = logger;
+        _configuration = configuration;
+        StripeConfiguration.ApiKey = _configuration["Stripe:SecretKey"];
     }
 
     // POST: api/orders (Exporter only)
@@ -199,13 +203,16 @@ public class OrdersController : ControllerBase
         }
     }
 
-    // PUT: api/orders/{id}/status (Admin or Farmer can update status)
+    // PUT: api/orders/{id}/status (Admin, Farmer, or Exporter can update status)
     [HttpPut("{id}/status")]
-    [Authorize(Roles = "Admin,Farmer")]
+    [Authorize(Roles = "Admin,Farmer,Exporter")]
     public async Task<IActionResult> UpdateOrderStatus(int id, [FromBody] UpdateOrderStatusDto dto)
     {
         try
         {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+            var role = User.FindFirst(ClaimTypes.Role)?.Value;
+
             var order = await _context.Orders
                 .Include(o => o.OrderItems).ThenInclude(oi => oi.Product)
                 .Include(o => o.Transaction)
@@ -214,6 +221,15 @@ public class OrdersController : ControllerBase
             if (order == null)
             {
                 return NotFound(new { message = "Order not found" });
+            }
+
+            // Exporters can only mark their own Shipped orders as Delivered
+            if (role == "Exporter")
+            {
+                if (order.ExporterId != userId)
+                    return Forbid();
+                if (order.Status != "Shipped" || dto.Status != "Delivered")
+                    return BadRequest(new { message = "As an exporter, you can only confirm delivery of a shipped order." });
             }
 
             // Validate status transitions
@@ -230,6 +246,11 @@ public class OrdersController : ControllerBase
             if (!validTransitions.ContainsKey(order.Status) || !validTransitions[order.Status].Contains(dto.Status))
             {
                 return BadRequest(new { message = $"Cannot transition from '{order.Status}' to '{dto.Status}'." });
+            }
+
+            if (dto.Status == "Processing" && order.PaymentStatus != "Completed")
+            {
+                return BadRequest(new { message = "Cannot mark order as 'Processing' until payment is completed." });
             }
 
             order.Status = dto.Status;
@@ -269,7 +290,14 @@ public class OrdersController : ControllerBase
             }
             else if (dto.Status == "Cancelled")
             {
-                order.PaymentStatus = "Refunded";
+                if (order.PaymentStatus == "Completed")
+                {
+                    order.PaymentStatus = "Refunded";
+                }
+                else
+                {
+                    order.PaymentStatus = "Cancelled";
+                }
 
                 // Restore stock
                 foreach (var item in order.OrderItems)
@@ -282,10 +310,37 @@ public class OrdersController : ControllerBase
                     item.Product.UpdatedAt = DateTime.UtcNow;
                 }
 
-                // Update transaction
+                // Update transaction and issue Stripe Refund
                 if (order.Transaction != null)
                 {
-                    order.Transaction.Status = "Refunded";
+                    if (order.Transaction.Status == "Completed")
+                    {
+                        order.Transaction.Status = "Refunded";
+                    }
+                    else
+                    {
+                        order.Transaction.Status = "Cancelled";
+                    }
+                    
+                    if (!string.IsNullOrEmpty(order.Transaction.StripePaymentIntentId))
+                    {
+                        try
+                        {
+                            var refundOptions = new RefundCreateOptions
+                            {
+                                PaymentIntent = order.Transaction.StripePaymentIntentId
+                            };
+                            var refundService = new RefundService();
+                            await refundService.CreateAsync(refundOptions);
+                            _logger.LogInformation($"Successfully refunded Stripe payment intent {order.Transaction.StripePaymentIntentId}");
+                        }
+                        catch (StripeException ex)
+                        {
+                            _logger.LogError(ex, $"Stripe refund failed for PaymentIntent {order.Transaction.StripePaymentIntentId}");
+                            // We still mark it as cancelled/refunded locally, or we could return an error.
+                            // Assuming local state should match intent to cancel.
+                        }
+                    }
                 }
             }
 
@@ -303,7 +358,7 @@ public class OrdersController : ControllerBase
     // PUT: api/orders/{id}/confirm-payment (Exporter confirms payment)
     [HttpPut("{id}/confirm-payment")]
     [Authorize(Roles = "Exporter")]
-    public async Task<IActionResult> ConfirmPayment(int id)
+    public async Task<IActionResult> ConfirmPayment(int id, [FromBody] ConfirmPaymentDto dto)
     {
         try
         {
@@ -334,6 +389,10 @@ public class OrdersController : ControllerBase
             {
                 order.Transaction.Status = "Completed";
                 order.Transaction.CompletedAt = DateTime.UtcNow;
+                if (!string.IsNullOrEmpty(dto.PaymentIntentId))
+                {
+                    order.Transaction.StripePaymentIntentId = dto.PaymentIntentId;
+                }
             }
 
             await _context.SaveChangesAsync();
@@ -368,9 +427,9 @@ public class OrdersController : ControllerBase
             if (role == "Exporter" && order.ExporterId != userId)
                 return Forbid();
 
-            // Exporter can only cancel Pending orders; Admin can cancel Pending or Confirmed
-            if (role == "Exporter" && order.Status != "Pending")
-                return BadRequest(new { message = "You can only cancel orders before the farmer accepts them." });
+            // Exporter can cancel Pending or Confirmed orders; Admin can cancel Pending or Confirmed
+            if (role == "Exporter" && order.Status != "Pending" && order.Status != "Confirmed")
+                return BadRequest(new { message = "You can only cancel pending or confirmed orders." });
 
             if (role == "Admin" && order.Status != "Pending" && order.Status != "Confirmed")
                 return BadRequest(new { message = "Only pending or confirmed orders can be cancelled." });
@@ -387,12 +446,44 @@ public class OrdersController : ControllerBase
             }
 
             order.Status = "Cancelled";
-            order.PaymentStatus = "Refunded";
+            if (order.PaymentStatus == "Completed")
+            {
+                order.PaymentStatus = "Refunded";
+            }
+            else
+            {
+                order.PaymentStatus = "Cancelled";
+            }
             order.UpdatedAt = DateTime.UtcNow;
 
             if (order.Transaction != null)
             {
-                order.Transaction.Status = "Refunded";
+                if (order.Transaction.Status == "Completed")
+                {
+                    order.Transaction.Status = "Refunded";
+                }
+                else
+                {
+                    order.Transaction.Status = "Cancelled";
+                }
+                
+                if (!string.IsNullOrEmpty(order.Transaction.StripePaymentIntentId))
+                {
+                    try
+                    {
+                        var refundOptions = new RefundCreateOptions
+                        {
+                            PaymentIntent = order.Transaction.StripePaymentIntentId
+                        };
+                        var refundService = new RefundService();
+                        await refundService.CreateAsync(refundOptions);
+                        _logger.LogInformation($"Successfully refunded Stripe payment intent {order.Transaction.StripePaymentIntentId}");
+                    }
+                    catch (StripeException ex)
+                    {
+                        _logger.LogError(ex, $"Stripe refund failed for PaymentIntent {order.Transaction.StripePaymentIntentId}");
+                    }
+                }
             }
 
             await _context.SaveChangesAsync();

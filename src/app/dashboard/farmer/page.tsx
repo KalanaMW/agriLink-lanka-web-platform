@@ -11,6 +11,9 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { fadeInUp, staggerContainer } from '@/components/animations/PageTransition';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import { 
+  Wheat, Leaf, Hourglass, ClipboardList, Wallet, Package, MapPin, Search 
+} from 'lucide-react';
 
 export default function FarmerDashboard() {
   const { user } = useAuth();
@@ -83,7 +86,7 @@ export default function FarmerDashboard() {
             transition={{ duration: 0.5 }}
             className="mb-8"
           >
-            <h1 className="text-3xl font-bold text-gray-900">Farmer Dashboard</h1>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3"><Wheat className="w-8 h-8 text-green-600" /> Farmer Dashboard</h1>
             <p className="mt-2 text-gray-600">Welcome back, {user?.fullName}!</p>
           </motion.div>
 
@@ -94,31 +97,59 @@ export default function FarmerDashboard() {
             variants={staggerContainer}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
           >
-            <motion.div variants={fadeInUp} whileHover={{ scale: 1.05, y: -5 }} className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-500">Total Products</div>
-              <div className="mt-2 text-3xl font-bold text-gray-900">{dashboardData?.totalProducts ?? products.length}</div>
-              <div className="text-xs text-gray-400 mt-1">{dashboardData?.approvedProducts ?? products.filter(p => p.status === 'Available').length} available</div>
-            </motion.div>
-            <motion.div variants={fadeInUp} whileHover={{ scale: 1.05, y: -5 }} className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-500">Pending Approval</div>
-              <div className="mt-2 text-3xl font-bold text-yellow-600">
-                {dashboardData?.pendingProducts ?? products.filter(p => p.status === 'Pending').length}
+            <motion.div variants={fadeInUp} className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm font-medium text-gray-500">Total Products</div>
+                  <div className="mt-2 text-3xl font-bold text-gray-900">{dashboardData?.totalProducts ?? products.length}</div>
+                  <div className="text-xs text-gray-400 mt-2">{dashboardData?.approvedProducts ?? products.filter(p => p.status === 'Available').length} available</div>
+                </div>
+                <div className="p-3 rounded-lg bg-green-50 text-green-600">
+                  <Leaf className="w-6 h-6" />
+                </div>
               </div>
-              <div className="text-xs text-gray-400 mt-1">awaiting admin review</div>
             </motion.div>
-            <motion.div variants={fadeInUp} whileHover={{ scale: 1.05, y: -5 }} className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-500">Total Orders</div>
-              <div className="mt-2 text-3xl font-bold text-blue-600">
-                {dashboardData?.totalOrders ?? 0}
+            <motion.div variants={fadeInUp} className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm font-medium text-gray-500">Pending Approval</div>
+                  <div className="mt-2 text-3xl font-bold text-yellow-600">
+                    {dashboardData?.pendingProducts ?? products.filter(p => p.status === 'Pending').length}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-2">awaiting admin review</div>
+                </div>
+                <div className="p-3 rounded-lg bg-yellow-50 text-yellow-600">
+                  <Hourglass className="w-6 h-6" />
+                </div>
               </div>
-              <div className="text-xs text-gray-400 mt-1">orders containing your products</div>
             </motion.div>
-            <motion.div variants={fadeInUp} whileHover={{ scale: 1.05, y: -5 }} className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-500">Total Revenue</div>
-              <div className="mt-2 text-2xl font-bold text-green-600">
-                {formatCurrency(dashboardData?.totalRevenue ?? 0)}
+            <motion.div variants={fadeInUp} className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm font-medium text-gray-500">Total Orders</div>
+                  <div className="mt-2 text-3xl font-bold text-blue-600">
+                    {dashboardData?.totalOrders ?? 0}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-2">orders containing your products</div>
+                </div>
+                <div className="p-3 rounded-lg bg-blue-50 text-blue-600">
+                  <ClipboardList className="w-6 h-6" />
+                </div>
               </div>
-              <div className="text-xs text-gray-400 mt-1">from delivered orders</div>
+            </motion.div>
+            <motion.div variants={fadeInUp} className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm font-medium text-gray-500">Total Revenue</div>
+                  <div className="mt-2 text-2xl font-bold text-green-600">
+                    {formatCurrency(dashboardData?.totalRevenue ?? 0)}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-2">from delivered orders</div>
+                </div>
+                <div className="p-3 rounded-lg bg-emerald-50 text-emerald-600">
+                  <Wallet className="w-6 h-6" />
+                </div>
+              </div>
             </motion.div>
           </motion.div>
 
@@ -129,7 +160,7 @@ export default function FarmerDashboard() {
             transition={{ delay: 0.25, duration: 0.5 }}
             className="bg-white rounded-lg shadow p-6 mb-8"
           >
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Stock Summary</h2>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Package className="w-5 h-5 text-gray-400" /> Current Stock Summary</h3>
             {products.length === 0 ? (
               <p className="text-gray-500 text-sm">No products listed yet.</p>
             ) : (

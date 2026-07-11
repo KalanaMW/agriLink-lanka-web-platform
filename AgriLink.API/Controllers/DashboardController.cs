@@ -200,8 +200,8 @@ public class DashboardController : ControllerBase
                 .Where(u => u.Role == "Exporter")
                 .CountAsync();
 
-            var unverifiedExporters = await _context.Users
-                .Where(u => u.Role == "Exporter" && !u.IsVerified)
+            var unverifiedUsers = await _context.Users
+                .Where(u => u.Role != "Admin" && !u.IsVerified)
                 .CountAsync();
 
             var pendingProducts = await _context.Products
@@ -248,8 +248,8 @@ public class DashboardController : ControllerBase
                 })
                 .ToListAsync();
 
-            var recentUnverifiedExporters = await _context.Users
-                .Where(u => u.Role == "Exporter" && !u.IsVerified)
+            var recentUnverifiedUsers = await _context.Users
+                .Where(u => u.Role != "Admin" && !u.IsVerified)
                 .OrderBy(u => u.CreatedAt)
                 .Take(5)
                 .Select(u => new UserDto
@@ -264,6 +264,7 @@ public class DashboardController : ControllerBase
                     CompanyName = u.CompanyName,
                     IsVerified = u.IsVerified,
                     ProfileImageUrl = u.ProfileImageUrl,
+                    FarmerIdProofUrl = u.FarmerIdProofUrl,
                     CreatedAt = u.CreatedAt
                 })
                 .ToListAsync();
@@ -273,13 +274,13 @@ public class DashboardController : ControllerBase
                 TotalUsers = totalUsers,
                 TotalFarmers = totalFarmers,
                 TotalExporters = totalExporters,
-                UnverifiedExporters = unverifiedExporters,
+                UnverifiedUsers = unverifiedUsers,
                 PendingProducts = pendingProducts,
                 TotalProducts = totalProducts,
                 TotalOrders = totalOrders,
                 TotalRevenue = totalRevenue,
                 RecentPendingProducts = recentPendingProducts,
-                RecentUnverifiedExporters = recentUnverifiedExporters
+                RecentUnverifiedUsers = recentUnverifiedUsers
             });
         }
         catch (Exception ex)

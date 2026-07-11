@@ -10,6 +10,11 @@ import { orderService } from '@/services/orderService';
 import { Product, Order, FarmerDashboard, ExporterDashboard, AdminDashboard } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import SendReportModal from '@/components/ui/SendReportModal';
+import {
+  LineChart, Leaf, ClipboardList, Wallet, BarChart3, Package, Plane,
+  Hourglass, Medal, MapPin, Receipt, CreditCard, Clock, Settings,
+  Users, Wheat, Ship, Unlock
+} from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
   Available: 'bg-green-500', Pending: 'bg-yellow-500', Sold: 'bg-blue-500', OutOfStock: 'bg-red-500',
@@ -41,12 +46,21 @@ function BarChart({ data, colors }: { data: Record<string, number>; colors: Reco
   );
 }
 
-function StatCard({ label, value, sub, color = 'text-gray-900' }: { label: string; value: string | number; sub?: string; color?: string }) {
+function StatCard({ label, value, sub, color = 'text-gray-900', icon, bgIconColor = 'bg-gray-50', iconColor = 'text-gray-500' }: { label: string; value: string | number; sub?: string; color?: string; icon?: React.ReactNode; bgIconColor?: string; iconColor?: string }) {
   return (
-    <div className="bg-white rounded-xl shadow p-5">
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className={`text-3xl font-bold mt-1 ${color}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-500">{label}</p>
+          <p className={`text-3xl font-bold mt-2 ${color}`}>{value}</p>
+          {sub && <p className="text-xs text-gray-400 mt-2">{sub}</p>}
+        </div>
+        {icon && (
+          <div className={`p-3 rounded-lg ${bgIconColor} ${iconColor}`}>
+            {icon}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -131,7 +145,7 @@ export default function AnalyticsPage() {
           totalUsers: adminDash?.totalUsers ?? 0,
           totalFarmers: adminDash?.totalFarmers ?? 0,
           totalExporters: adminDash?.totalExporters ?? 0,
-          unverifiedExporters: adminDash?.unverifiedExporters ?? 0,
+          unverifiedUsers: adminDash?.unverifiedUsers ?? 0,
           totalProducts: adminDash?.totalProducts ?? 0,
           pendingProducts: adminDash?.pendingProducts ?? 0,
           totalOrders: adminDash?.totalOrders ?? 0,
@@ -226,34 +240,34 @@ export default function AnalyticsPage() {
 
     return (
       <>
-        <p className="mt-2 text-gray-600">Insights into your farming business performance</p>
+        <p className="mt-2 text-gray-600 flex items-center gap-2"><LineChart className="w-5 h-5 text-gray-400"/> Insights into your farming business performance</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6">
-          <StatCard label="Total Products" value={products.length} />
-          <StatCard label="Total Orders" value={orders.length} color="text-blue-600" />
-          <StatCard label="Total Revenue" value={formatCurrency(totalRevenue)} color="text-green-600" />
-          <StatCard label="Avg Price/kg" value={formatCurrency(avgPrice)} color="text-purple-600" />
+          <StatCard label="Total Products" value={products.length} icon={<Leaf className="w-6 h-6" />} bgIconColor="bg-green-50" iconColor="text-green-600" />
+          <StatCard label="Total Orders" value={orders.length} color="text-blue-600" icon={<ClipboardList className="w-6 h-6" />} bgIconColor="bg-blue-50" iconColor="text-blue-600" />
+          <StatCard label="Total Revenue" value={formatCurrency(totalRevenue)} color="text-green-600" icon={<Wallet className="w-6 h-6" />} bgIconColor="bg-emerald-50" iconColor="text-emerald-600" />
+          <StatCard label="Avg Price/kg" value={formatCurrency(avgPrice)} color="text-purple-600" icon={<BarChart3 className="w-6 h-6" />} bgIconColor="bg-purple-50" iconColor="text-purple-600" />
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <StatCard label="Total Stock" value={`${totalStock.toFixed(1)} kg`} />
-          <StatCard label="Organic Products" value={organicCount} color="text-green-600" sub={`${products.length > 0 ? ((organicCount / products.length) * 100).toFixed(0) : 0}% of total`} />
-          <StatCard label="Export Ready" value={exportReadyCount} color="text-blue-600" sub={`${products.length > 0 ? ((exportReadyCount / products.length) * 100).toFixed(0) : 0}% of total`} />
-          <StatCard label="Pending Approval" value={statusDistribution['Pending'] || 0} color="text-yellow-600" />
+          <StatCard label="Total Stock" value={`${totalStock.toFixed(1)} kg`} icon={<Package className="w-6 h-6" />} bgIconColor="bg-orange-50" iconColor="text-orange-600" />
+          <StatCard label="Organic Products" value={organicCount} color="text-green-600" sub={`${products.length > 0 ? ((organicCount / products.length) * 100).toFixed(0) : 0}% of total`} icon={<Leaf className="w-6 h-6" />} bgIconColor="bg-green-50" iconColor="text-green-600" />
+          <StatCard label="Export Ready" value={exportReadyCount} color="text-blue-600" sub={`${products.length > 0 ? ((exportReadyCount / products.length) * 100).toFixed(0) : 0}% of total`} icon={<Plane className="w-6 h-6" />} bgIconColor="bg-blue-50" iconColor="text-blue-600" />
+          <StatCard label="Pending Approval" value={statusDistribution['Pending'] || 0} color="text-yellow-600" icon={<Hourglass className="w-6 h-6" />} bgIconColor="bg-yellow-50" iconColor="text-yellow-600" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Status</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-gray-400" /> Product Status</h3>
             {Object.keys(statusDistribution).length > 0 ? <BarChart data={statusDistribution} colors={STATUS_COLORS} /> : <p className="text-gray-400 text-center py-4">No products yet</p>}
           </div>
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Grade Distribution</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Medal className="w-5 h-5 text-gray-400" /> Grade Distribution</h3>
             {Object.keys(gradeDistribution).length > 0 ? <BarChart data={gradeDistribution} colors={GRADE_COLORS} /> : <p className="text-gray-400 text-center py-4">No products yet</p>}
           </div>
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Status</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><ClipboardList className="w-5 h-5 text-gray-400" /> Order Status</h3>
             {Object.keys(orderStatusDist).length > 0 ? <BarChart data={orderStatusDist} colors={ORDER_STATUS_COLORS} /> : <p className="text-gray-400 text-center py-4">No orders yet</p>}
           </div>
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Products by District</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><MapPin className="w-5 h-5 text-gray-400" /> Products by District</h3>
             {Object.keys(districtDistribution).length > 0 ? (
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {Object.entries(districtDistribution).sort((a, b) => b[1] - a[1]).map(([district, count]) => {
@@ -275,7 +289,7 @@ export default function AnalyticsPage() {
         </div>
         {orders.length > 0 && (
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Orders (containing your products)</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Receipt className="w-5 h-5 text-gray-400" /> Recent Orders (containing your products)</h3>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -321,20 +335,20 @@ export default function AnalyticsPage() {
 
     return (
       <>
-        <p className="mt-2 text-gray-600">Track your procurement and spending analytics</p>
+        <p className="mt-2 text-gray-600 flex items-center gap-2"><Ship className="w-5 h-5 text-gray-400" /> Track your procurement and spending analytics</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6">
-          <StatCard label="Total Orders" value={orders.length} />
-          <StatCard label="Total Spent" value={formatCurrency(totalSpent)} color="text-green-600" />
-          <StatCard label="Avg Order Value" value={formatCurrency(avgOrderValue)} color="text-blue-600" />
-          <StatCard label="Pending Payment" value={pendingPayment} color="text-yellow-600" />
+          <StatCard label="Total Orders" value={orders.length} icon={<ClipboardList className="w-6 h-6" />} bgIconColor="bg-blue-50" iconColor="text-blue-600" />
+          <StatCard label="Total Spent" value={formatCurrency(totalSpent)} color="text-green-600" icon={<CreditCard className="w-6 h-6" />} bgIconColor="bg-green-50" iconColor="text-green-600" />
+          <StatCard label="Avg Order Value" value={formatCurrency(avgOrderValue)} color="text-blue-600" icon={<BarChart3 className="w-6 h-6" />} bgIconColor="bg-blue-50" iconColor="text-blue-600" />
+          <StatCard label="Pending Payment" value={pendingPayment} color="text-yellow-600" icon={<Clock className="w-6 h-6" />} bgIconColor="bg-yellow-50" iconColor="text-yellow-600" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Status Breakdown</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-gray-400" /> Order Status Breakdown</h3>
             {Object.keys(orderStatusDist).length > 0 ? <BarChart data={orderStatusDist} colors={ORDER_STATUS_COLORS} /> : <p className="text-gray-400 text-center py-4">No orders yet</p>}
           </div>
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Spending Overview</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Wallet className="w-5 h-5 text-gray-400" /> Spending Overview</h3>
             <div className="space-y-4">
               <div className="flex justify-between items-center py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-600">Total Spent (Delivered)</span>
@@ -357,7 +371,7 @@ export default function AnalyticsPage() {
         </div>
         {orders.length > 0 && (
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Order History</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Receipt className="w-5 h-5 text-gray-400" /> Order History</h3>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -407,32 +421,32 @@ export default function AnalyticsPage() {
 
     return (
       <>
-        <p className="mt-2 text-gray-600">Platform-wide analytics and insights</p>
+        <p className="mt-2 text-gray-600 flex items-center gap-2"><Settings className="w-5 h-5 text-gray-400" /> Platform-wide analytics and insights</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6">
-          <StatCard label="Total Users" value={dash?.totalUsers ?? 0} />
-          <StatCard label="Total Products" value={dash?.totalProducts ?? 0} color="text-blue-600" />
-          <StatCard label="Total Orders" value={dash?.totalOrders ?? 0} color="text-purple-600" />
-          <StatCard label="Total Revenue" value={formatCurrency(dash?.totalRevenue ?? 0)} color="text-green-600" />
+          <StatCard label="Total Users" value={dash?.totalUsers ?? 0} icon={<Users className="w-6 h-6" />} bgIconColor="bg-indigo-50" iconColor="text-indigo-600" />
+          <StatCard label="Total Products" value={dash?.totalProducts ?? 0} color="text-blue-600" icon={<Leaf className="w-6 h-6" />} bgIconColor="bg-blue-50" iconColor="text-blue-600" />
+          <StatCard label="Total Orders" value={dash?.totalOrders ?? 0} color="text-purple-600" icon={<ClipboardList className="w-6 h-6" />} bgIconColor="bg-purple-50" iconColor="text-purple-600" />
+          <StatCard label="Total Revenue" value={formatCurrency(dash?.totalRevenue ?? 0)} color="text-green-600" icon={<Wallet className="w-6 h-6" />} bgIconColor="bg-green-50" iconColor="text-green-600" />
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <StatCard label="Farmers" value={dash?.totalFarmers ?? 0} color="text-green-600" />
-          <StatCard label="Exporters" value={dash?.totalExporters ?? 0} color="text-blue-600" />
-          <StatCard label="Pending Products" value={dash?.pendingProducts ?? 0} color="text-yellow-600" />
-          <StatCard label="Unverified Exporters" value={dash?.unverifiedExporters ?? 0} color="text-orange-600" />
+          <StatCard label="Farmers" value={dash?.totalFarmers ?? 0} color="text-green-600" icon={<Wheat className="w-6 h-6" />} bgIconColor="bg-green-50" iconColor="text-green-600" />
+          <StatCard label="Exporters" value={dash?.totalExporters ?? 0} color="text-blue-600" icon={<Ship className="w-6 h-6" />} bgIconColor="bg-blue-50" iconColor="text-blue-600" />
+          <StatCard label="Pending Products" value={dash?.pendingProducts ?? 0} color="text-yellow-600" icon={<Hourglass className="w-6 h-6" />} bgIconColor="bg-yellow-50" iconColor="text-yellow-600" />
+          <StatCard label="Unverified Users" value={dash?.unverifiedUsers ?? 0} color="text-orange-600" icon={<Unlock className="w-6 h-6" />} bgIconColor="bg-orange-50" iconColor="text-orange-600" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Status Distribution</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-gray-400" /> Product Status Distribution</h3>
             {Object.keys(statusDistribution).length > 0 ? <BarChart data={statusDistribution} colors={STATUS_COLORS} /> : <p className="text-gray-400 text-center py-4">No products yet</p>}
           </div>
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Grade Distribution</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Medal className="w-5 h-5 text-gray-400" /> Grade Distribution</h3>
             {Object.keys(gradeDistribution).length > 0 ? <BarChart data={gradeDistribution} colors={GRADE_COLORS} /> : <p className="text-gray-400 text-center py-4">No products yet</p>}
           </div>
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">User Breakdown</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Users className="w-5 h-5 text-gray-400" /> User Breakdown</h3>
             <BarChart
-              data={{ Farmers: dash?.totalFarmers ?? 0, Exporters: dash?.totalExporters ?? 0, 'Unverified Exporters': dash?.unverifiedExporters ?? 0 }}
+              data={{ Farmers: dash?.totalFarmers ?? 0, Exporters: dash?.totalExporters ?? 0, 'Unverified Users': dash?.unverifiedUsers ?? 0 }}
               colors={{ Farmers: 'bg-green-500', Exporters: 'bg-blue-500', 'Unverified Exporters': 'bg-orange-500' }}
             />
           </div>
@@ -459,7 +473,7 @@ export default function AnalyticsPage() {
         </div>
         {(dash?.recentPendingProducts?.length ?? 0) > 0 && (
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Pending Products</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Hourglass className="w-5 h-5 text-gray-400" /> Recent Pending Products</h3>
             <div className="divide-y divide-gray-100">
               {dash!.recentPendingProducts.slice(0, 5).map(p => (
                 <div key={p.id} className="flex items-center justify-between py-3">

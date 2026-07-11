@@ -21,8 +21,8 @@ export const orderService = {
     await api.put(`/orders/${id}/status`, data);
   },
 
-  async confirmPayment(id: number): Promise<void> {
-    await api.put(`/orders/${id}/confirm-payment`);
+  async confirmPayment(id: number, paymentIntentId?: string): Promise<void> {
+    await api.put(`/orders/${id}/confirm-payment`, { paymentIntentId });
   },
 
   async cancelOrder(id: number): Promise<void> {

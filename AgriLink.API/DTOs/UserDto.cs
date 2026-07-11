@@ -13,6 +13,7 @@ namespace AgriLink.API.DTOs
         public bool IsVerified { get; set; }
         public bool IsActive { get; set; }
         public string? ProfileImageUrl { get; set; }
+        public string? FarmerIdProofUrl { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 }

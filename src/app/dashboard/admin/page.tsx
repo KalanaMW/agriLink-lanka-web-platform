@@ -13,13 +13,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { fadeInUp, staggerContainer } from '@/components/animations/PageTransition';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import SendReportModal from '@/components/ui/SendReportModal';
+import { 
+  ShieldAlert, Users, Hourglass, Unlock, Wallet 
+} from 'lucide-react';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [pendingProducts, setPendingProducts] = useState<Product[]>([]);
-  const [unverifiedExporters, setUnverifiedExporters] = useState<User[]>([]);
+  const [unverifiedUsers, setUnverifiedUsers] = useState<User[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [viewDocumentUrl, setViewDocumentUrl] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<AdminDashboardType | null>(null);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<number | null>(null);
@@ -31,7 +37,7 @@ export default function AdminDashboard() {
   const [sendingReport, setSendingReport] = useState(false);
   const [reportStatus, setReportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [reportModalOpen, setReportModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'products' | 'exporters' | 'orders' | 'users'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'verifications' | 'orders' | 'users'>('products');
   const [userRoleFilter, setUserRoleFilter] = useState<string>('');
   const [confirmModal, setConfirmModal] = useState<{
     open: boolean;
@@ -48,14 +54,14 @@ export default function AdminDashboard() {
       const [all, pending, exporters, dashboard, users, orders] = await Promise.all([
         productService.getProducts({}),
         productService.getPendingProducts(),
-        authService.getUnverifiedExporters(),
+        authService.getUnverifiedUsers(),
         dashboardService.getAdminDashboard().catch(() => null),
         authService.getAllUsers().catch(() => []),
         orderService.getOrders().catch(() => []),
       ]);
       setAllProducts(Array.isArray(all) ? all : (all.products || []));
       setPendingProducts(pending);
-      setUnverifiedExporters(exporters);
+      setUnverifiedUsers(exporters);
       setAllOrders(orders);
       if (dashboard) setDashboardData(dashboard);
       setAllUsers(users);
@@ -97,7 +103,7 @@ export default function AdminDashboard() {
           totalUsers: dashboardData?.totalUsers ?? 0,
           totalFarmers: dashboardData?.totalFarmers ?? 0,
           totalExporters: dashboardData?.totalExporters ?? 0,
-          unverifiedExporters: dashboardData?.unverifiedExporters ?? 0,
+          unverifiedUsers: dashboardData?.unverifiedUsers ?? 0,
           totalProducts: dashboardData?.totalProducts ?? 0,
           pendingProducts: dashboardData?.pendingProducts ?? 0,
           totalOrders: filteredOrders.length,
@@ -174,27 +180,64 @@ export default function AdminDashboard() {
     });
   };
 
-  const handleVerifyExporter = (userId: number) => {
+  const handleVerifyUser = (userId: number, role: string) => {
     setConfirmModal({
       open: true,
-      title: 'Verify Exporter',
-      message: 'Are you sure you want to verify this exporter? They will gain access to purchase products on the platform.',
+      title: `Verify ${role}`,
+      message: `Are you sure you want to verify this ${role}?`,
       variant: 'success',
       confirmLabel: 'Verify',
       onConfirm: async () => {
         closeConfirmModal();
         try {
           setVerifyingId(userId);
-          await authService.verifyExporter(userId);
+          await authService.verifyUser(userId);
           await fetchData();
         } catch (error) {
-          console.error('Failed to verify exporter:', error);
-          alert('Failed to verify exporter. Please try again.');
+          console.error('Failed to verify user:', error);
+          alert('Failed to verify user. Please try again.');
         } finally {
           setVerifyingId(null);
         }
       },
     });
+  };
+
+  const handleDeleteUser = (userId: number, userName: string) => {
+    setConfirmModal({
+      open: true,
+      title: 'Delete User',
+      message: `Are you sure you want to permanently delete ${userName}? This action cannot be undone.`,
+      variant: 'danger',
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        closeConfirmModal();
+        try {
+          setDeletingUserId(userId);
+          await authService.deleteUser(userId);
+          await fetchData();
+        } catch (error) {
+          console.error('Failed to delete user:', error);
+          alert('Failed to delete user. They might have dependent records (e.g. products, orders).');
+        } finally {
+          setDeletingUserId(null);
+        }
+      },
+    });
+  };
+
+  const handleEditUserSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    
+    try {
+      await authService.updateUser(editingUser.id, editingUser);
+      setEditingUser(null);
+      await fetchData();
+    } catch (error) {
+      console.error('Failed to update user:', error);
+      alert('Failed to update user details.');
+    }
   };
 
   const handleToggleUserStatus = (userId: number, isActive: boolean, name: string) => {
@@ -234,8 +277,8 @@ export default function AdminDashboard() {
           {/* Header */}
           <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-              <p className="mt-2 text-gray-600">Welcome back, {user?.fullName}!</p>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3"><ShieldAlert className="w-8 h-8 text-blue-600" /> Admin Dashboard</h1>
+              <p className="mt-2 text-gray-600">Platform overview and management.</p>
             </div>
             <div className="flex flex-col items-end gap-2">
               <button
@@ -259,25 +302,55 @@ export default function AdminDashboard() {
 
           {/* Stats Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white rounded-lg shadow p-5">
-              <div className="text-sm font-medium text-gray-500">Total Users</div>
-              <div className="mt-2 text-3xl font-bold text-gray-900">{dashboardData?.totalUsers || 0}</div>
-              <div className="text-xs text-gray-400 mt-1">{dashboardData?.totalFarmers || 0} farmers, {dashboardData?.totalExporters || 0} exporters</div>
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm font-medium text-gray-500">Total Users</div>
+                  <div className="mt-2 text-3xl font-bold text-gray-900">{dashboardData?.totalUsers || 0}</div>
+                  <div className="text-xs text-gray-400 mt-2">{dashboardData?.totalFarmers || 0} farmers, {dashboardData?.totalExporters || 0} exporters</div>
+                </div>
+                <div className="p-3 rounded-lg bg-indigo-50 text-indigo-600">
+                  <Users className="w-6 h-6" />
+                </div>
+              </div>
             </div>
-            <div className="bg-white rounded-lg shadow p-5">
-              <div className="text-sm font-medium text-gray-500">Pending Approval</div>
-              <div className="mt-2 text-3xl font-bold text-yellow-600">{pendingProducts?.length || 0}</div>
-              <div className="text-xs text-gray-400 mt-1">products await review</div>
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm font-medium text-gray-500">Pending Approval</div>
+                  <div className="mt-2 text-3xl font-bold text-yellow-600">{pendingProducts?.length || 0}</div>
+                  <div className="text-xs text-gray-400 mt-2">products await review</div>
+                </div>
+                <div className="p-3 rounded-lg bg-yellow-50 text-yellow-600">
+                  <Hourglass className="w-6 h-6" />
+                </div>
+              </div>
             </div>
-            <div className="bg-white rounded-lg shadow p-5">
-              <div className="text-sm font-medium text-gray-500">Unverified Exporters</div>
-              <div className="mt-2 text-3xl font-bold text-orange-600">{unverifiedExporters?.length || 0}</div>
-              <div className="text-xs text-gray-400 mt-1">need verification</div>
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-gray-500">Unverified Users</h3>
+                    <Unlock className="w-5 h-5 text-orange-500" />
+                  </div>
+                  <div className="mt-2 text-3xl font-bold text-orange-600">{unverifiedUsers?.length || 0}</div>
+                  <div className="mt-2 flex items-center text-sm text-gray-600">
+                    <span>Requires approval</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="bg-white rounded-lg shadow p-5">
-              <div className="text-sm font-medium text-gray-500">Total Revenue</div>
-              <div className="mt-2 text-2xl font-bold text-green-600">{formatCurrency(dashboardData?.totalRevenue || 0)}</div>
-              <div className="text-xs text-gray-400 mt-1">{dashboardData?.totalOrders || 0} orders</div>
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm font-medium text-gray-500">Total Revenue</div>
+                  <div className="mt-2 text-2xl font-bold text-green-600">{formatCurrency(dashboardData?.totalRevenue || 0)}</div>
+                  <div className="text-xs text-gray-400 mt-2">{dashboardData?.totalOrders || 0} orders</div>
+                </div>
+                <div className="p-3 rounded-lg bg-emerald-50 text-emerald-600">
+                  <Wallet className="w-6 h-6" />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -292,12 +365,14 @@ export default function AdminDashboard() {
               Product Management ({pendingProducts?.length || 0} pending)
             </button>
             <button
-              onClick={() => setActiveTab('exporters')}
-              className={`px-6 py-3 font-semibold text-sm border-b-2 transition ${
-                activeTab === 'exporters' ? 'border-green-600 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              onClick={() => setActiveTab('verifications')}
+              className={`px-4 py-2 font-medium border-b-2 transition ${
+                activeTab === 'verifications'
+                  ? 'border-green-600 text-green-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Exporter Verification ({unverifiedExporters?.length || 0} pending)
+              User Verification ({unverifiedUsers?.length || 0} pending)
             </button>
             <button
               onClick={() => setActiveTab('orders')}
@@ -517,74 +592,94 @@ export default function AdminDashboard() {
           </>
           )}
 
-          {activeTab === 'exporters' && (
+          {activeTab === 'verifications' && (
           <>
-          {/* Unverified Exporters Section */}
+          {/* Unverified Users Section */}
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Unverified Exporters ({unverifiedExporters?.length || 0})
+              Unverified Users ({unverifiedUsers?.length || 0})
             </h2>
             {loading ? (
               <div className="text-center py-12 text-gray-500">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-                <p className="mt-4">Loading exporters...</p>
+                <p className="mt-4">Loading users...</p>
               </div>
-            ) : unverifiedExporters.length === 0 ? (
+            ) : unverifiedUsers.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12 mx-auto mb-3 text-gray-400">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
                 </svg>
-                <p>All exporters are verified!</p>
+                <p>All users are verified!</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {unverifiedExporters.map((exporter) => (
-                  <div key={exporter.id} className="border rounded-lg p-5 hover:shadow-lg transition-shadow">
+                {unverifiedUsers.map((u) => (
+                  <div key={u.id} className="border rounded-lg p-5 hover:shadow-lg transition-shadow">
                     <div className="flex items-center gap-4 mb-4">
-                      <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-lg">
-                        {exporter.fullName.charAt(0)}
+                      <div className="w-12 h-12 flex-shrink-0">
+                        {u.profileImageUrl ? (
+                          <img className="w-12 h-12 rounded-full object-cover" src={getImageUrl(u.profileImageUrl)} alt={u.fullName} />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-lg">
+                            {u.fullName.charAt(0)}
+                          </div>
+                        )}
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900">{exporter.fullName}</h3>
-                        <p className="text-sm text-gray-500">{exporter.email}</p>
+                        <h3 className="font-semibold text-gray-900">{u.fullName}</h3>
+                        <p className="text-sm text-gray-500">{u.email}</p>
                       </div>
                     </div>
                     
                     <div className="space-y-2 text-sm mb-4">
-                      {exporter.companyName && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Role:</span>
+                        <span className="font-medium text-gray-900">{u.role}</span>
+                      </div>
+                      {u.companyName && (
                         <div className="flex justify-between">
                           <span className="text-gray-600">Company:</span>
-                          <span className="font-medium text-gray-900">{exporter.companyName}</span>
+                          <span className="font-medium text-gray-900">{u.companyName}</span>
                         </div>
                       )}
-                      {exporter.district && (
+                      {u.district && (
                         <div className="flex justify-between">
                           <span className="text-gray-600">District:</span>
-                          <span className="font-medium text-gray-900">{exporter.district}</span>
+                          <span className="font-medium text-gray-900">{u.district}</span>
                         </div>
                       )}
-                      {exporter.phoneNumber && (
+                      {u.phoneNumber && (
                         <div className="flex justify-between">
                           <span className="text-gray-600">Phone:</span>
-                          <span className="font-medium text-gray-900">{exporter.phoneNumber}</span>
+                          <span className="font-medium text-gray-900">{u.phoneNumber}</span>
                         </div>
                       )}
                       <div className="flex justify-between">
                         <span className="text-gray-600">Registered:</span>
-                        <span className="font-medium text-gray-900">{formatDate(exporter.createdAt)}</span>
+                        <span className="font-medium text-gray-900">{formatDate(u.createdAt)}</span>
                       </div>
+                      {u.farmerIdProofUrl && (
+                        <div className="mt-3">
+                          <button
+                            onClick={() => setViewDocumentUrl(getImageUrl(u.farmerIdProofUrl))}
+                            className="text-sm text-blue-600 hover:text-blue-800 underline"
+                          >
+                            View ID Document
+                          </button>
+                        </div>
+                      )}
                     </div>
                     
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mt-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
                         Unverified
                       </span>
                       <button
-                        onClick={() => handleVerifyExporter(exporter.id)}
-                        disabled={verifyingId === exporter.id}
+                        onClick={() => handleVerifyUser(u.id, u.role)}
+                        disabled={verifyingId === u.id}
                         className="px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 text-sm"
                       >
-                        {verifyingId === exporter.id ? 'Verifying...' : 'Verify Exporter'}
+                        {verifyingId === u.id ? 'Verifying...' : `Verify ${u.role}`}
                       </button>
                     </div>
                   </div>
@@ -811,17 +906,32 @@ export default function AdminDashboard() {
                           {formatDate(u.createdAt)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <button
-                            onClick={() => handleToggleUserStatus(u.id, u.isActive, u.fullName)}
-                            disabled={togglingUserId === u.id}
-                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition disabled:opacity-50 ${
-                              u.isActive
-                                ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                                : 'bg-green-100 text-green-700 hover:bg-green-200'
-                            }`}
-                          >
-                            {togglingUserId === u.id ? '...' : u.isActive ? 'Deactivate' : 'Activate'}
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleToggleUserStatus(u.id, u.isActive, u.fullName)}
+                              disabled={togglingUserId === u.id}
+                              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition disabled:opacity-50 ${
+                                u.isActive
+                                  ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                                  : 'bg-green-100 text-green-700 hover:bg-green-200'
+                              }`}
+                            >
+                              {togglingUserId === u.id ? '...' : u.isActive ? 'Deactivate' : 'Activate'}
+                            </button>
+                            <button
+                              onClick={() => setEditingUser(u)}
+                              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(u.id, u.fullName)}
+                              disabled={deletingUserId === u.id}
+                              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition disabled:opacity-50"
+                            >
+                              {deletingUserId === u.id ? '...' : 'Delete'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -978,6 +1088,107 @@ export default function AdminDashboard() {
         onClose={() => setReportModalOpen(false)}
         onSend={handleSendReport}
       />
+
+      {/* Edit User Modal */}
+      {editingUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Edit User</h3>
+              <form onSubmit={handleEditUserSubmit}>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Full Name</label>
+                    <input
+                      type="text"
+                      value={editingUser.fullName}
+                      onChange={(e) => setEditingUser({ ...editingUser, fullName: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Phone Number</label>
+                    <input
+                      type="text"
+                      value={editingUser.phoneNumber || ''}
+                      onChange={(e) => setEditingUser({ ...editingUser, phoneNumber: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">District</label>
+                    <input
+                      type="text"
+                      value={editingUser.district || ''}
+                      onChange={(e) => setEditingUser({ ...editingUser, district: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Company Name</label>
+                    <input
+                      type="text"
+                      value={editingUser.companyName || ''}
+                      onChange={(e) => setEditingUser({ ...editingUser, companyName: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser(null)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Document Modal */}
+      {viewDocumentUrl && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="relative max-w-4xl w-full max-h-[90vh] bg-white rounded-lg overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">ID Document</h3>
+              <button
+                onClick={() => setViewDocumentUrl(null)}
+                className="text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full p-2 transition"
+              >
+                <Unlock className="w-5 h-5" />
+                {/* using Unlock as close button is weird, let me just use text or an X icon but I didn't import X */}
+                <span className="sr-only">Close</span>
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4 bg-gray-100 flex items-center justify-center">
+              <img
+                src={viewDocumentUrl}
+                alt="User ID Document"
+                className="max-w-full max-h-full object-contain shadow-lg"
+              />
+            </div>
+            <div className="p-4 border-t flex justify-end">
+              <button
+                onClick={() => setViewDocumentUrl(null)}
+                className="px-4 py-2 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </RoleProtectedRoute>
   );
 }

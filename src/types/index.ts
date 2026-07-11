@@ -11,6 +11,7 @@ export interface User {
   isVerified: boolean;
   isActive: boolean;
   profileImageUrl?: string;
+  farmerIdProofUrl?: string;
   createdAt: string;
 }
 
@@ -183,11 +184,11 @@ export interface AdminDashboard {
   totalUsers: number;
   totalFarmers: number;
   totalExporters: number;
-  unverifiedExporters: number;
+  unverifiedUsers: number;
   pendingProducts: number;
   totalProducts: number;
   totalOrders: number;
   totalRevenue: number;
   recentPendingProducts: Product[];
-  recentUnverifiedExporters: User[];
+  recentUnverifiedUsers: User[];
 }

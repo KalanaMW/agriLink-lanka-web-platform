@@ -7,7 +7,7 @@ import { productService } from '@/services/productService';
 import { dashboardService } from '@/services/dashboardService';
 import { Product, ExporterDashboard as ExporterDashboardType } from '@/types';
 import { getImageUrl, formatCurrency, formatDate } from '@/lib/utils';
-
+import { Ship, Leaf, ClipboardList, CheckCircle2, Wallet, Search, Filter, MapPin, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function ExporterDashboard() {
@@ -79,7 +79,7 @@ export default function ExporterDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Exporter Dashboard</h1>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3"><Ship className="w-8 h-8 text-blue-600" /> Exporter Dashboard</h1>
             <p className="mt-2 text-gray-600">Welcome back, {user?.fullName}!</p>
             {!user?.isVerified && (
               <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -100,33 +100,61 @@ export default function ExporterDashboard() {
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-500">Available Products</div>
-              <div className="mt-2 text-3xl font-bold text-gray-900">{dashboardData?.availableProducts ?? availableProducts.length}</div>
-              <div className="text-xs text-gray-400 mt-1">{exportReadyProducts.length} export ready</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-500">My Orders</div>
-              <div className="mt-2 text-3xl font-bold text-blue-600">{dashboardData?.totalOrders ?? 0}</div>
-              <div className="text-xs text-gray-400 mt-1">{dashboardData?.pendingOrders ?? 0} pending</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-500">Completed Orders</div>
-              <div className="mt-2 text-3xl font-bold text-green-600">{dashboardData?.completedOrders ?? 0}</div>
-              <div className="text-xs text-gray-400 mt-1">delivered successfully</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm font-medium text-gray-500">Total Spent</div>
-              <div className="mt-2 text-2xl font-bold text-gray-900">
-                {formatCurrency(dashboardData?.totalSpent ?? 0)}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm font-medium text-gray-500">Available Products</div>
+                  <div className="mt-2 text-3xl font-bold text-gray-900">{dashboardData?.availableProducts ?? availableProducts.length}</div>
+                  <div className="text-xs text-gray-400 mt-2">{exportReadyProducts.length} export ready</div>
+                </div>
+                <div className="p-3 rounded-lg bg-green-50 text-green-600">
+                  <Leaf className="w-6 h-6" />
+                </div>
               </div>
-              <div className="text-xs text-gray-400 mt-1">on delivered orders</div>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm font-medium text-gray-500">My Orders</div>
+                  <div className="mt-2 text-3xl font-bold text-blue-600">{dashboardData?.totalOrders ?? 0}</div>
+                  <div className="text-xs text-gray-400 mt-2">{dashboardData?.pendingOrders ?? 0} pending</div>
+                </div>
+                <div className="p-3 rounded-lg bg-blue-50 text-blue-600">
+                  <ClipboardList className="w-6 h-6" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm font-medium text-gray-500">Completed Orders</div>
+                  <div className="mt-2 text-3xl font-bold text-green-600">{dashboardData?.completedOrders ?? 0}</div>
+                  <div className="text-xs text-gray-400 mt-2">delivered successfully</div>
+                </div>
+                <div className="p-3 rounded-lg bg-emerald-50 text-emerald-600">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm font-medium text-gray-500">Total Spent</div>
+                  <div className="mt-2 text-2xl font-bold text-gray-900">
+                    {formatCurrency(dashboardData?.totalSpent ?? 0)}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-2">on delivered orders</div>
+                </div>
+                <div className="p-3 rounded-lg bg-gray-50 text-gray-600">
+                  <Wallet className="w-6 h-6" />
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Filters */}
           <div className="bg-white rounded-lg shadow p-6 mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Filter Products</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2"><Filter className="w-5 h-5 text-gray-400" /> Filter Products</h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
@@ -232,7 +260,9 @@ export default function ExporterDashboard() {
                     <div className="p-4">
                       <h3 className="font-semibold text-lg text-gray-900">{product.vegetableName}</h3>
                       {product.variety && (
-                        <p className="text-sm text-gray-500">{product.variety}</p>
+                        <div className="text-sm text-gray-500 flex items-center gap-1.5 mb-3">
+                          <MapPin className="w-4 h-4 text-gray-400" /> {product.district}
+                        </div>
                       )}
                       
                       <div className="mt-3 space-y-2">
@@ -284,9 +314,7 @@ export default function ExporterDashboard() {
                   onClick={() => setSelectedProduct(null)}
                   className="text-gray-400 hover:text-gray-600"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <X className="w-6 h-6" />
                 </button>
               </div>
 
