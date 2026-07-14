@@ -26,20 +26,15 @@ const ORDER_STATUS_COLORS: Record<string, string> = {
 const GRADE_COLORS: Record<string, string> = { A: 'bg-green-500', B: 'bg-blue-500', C: 'bg-yellow-500' };
 
 function BarChart({ data, colors }: { data: Record<string, number>; colors: Record<string, string> }) {
-  const max = Math.max(...Object.values(data), 1);
   return (
-    <div className="space-y-3">
+    <div className="space-y-4 pt-2">
       {Object.entries(data).map(([key, value]) => (
-        <div key={key} className="flex items-center gap-3">
-          <span className="text-sm font-medium text-gray-600 w-28 text-right truncate">{key}</span>
-          <div className="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
-            <div
-              className={`h-full rounded-full ${colors[key] || 'bg-gray-400'} flex items-center justify-end pr-2 transition-all duration-500`}
-              style={{ width: `${Math.max((value / max) * 100, 8)}%` }}
-            >
-              <span className="text-xs font-bold text-white">{value}</span>
-            </div>
+        <div key={key} className="flex items-center justify-between border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+          <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full ${colors[key] || 'bg-gray-400'}`}></div>
+            <span className="text-sm font-medium text-gray-700">{key}</span>
           </div>
+          <span className="text-sm font-bold text-gray-900">{value}</span>
         </div>
       ))}
     </div>
@@ -269,17 +264,15 @@ export default function AnalyticsPage() {
           <div className="bg-white rounded-xl shadow p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><MapPin className="w-5 h-5 text-gray-400" /> Products by District</h3>
             {Object.keys(districtDistribution).length > 0 ? (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
+              <div className="space-y-4 max-h-64 overflow-y-auto pt-2">
                 {Object.entries(districtDistribution).sort((a, b) => b[1] - a[1]).map(([district, count]) => {
-                  const max = Math.max(...Object.values(districtDistribution), 1);
                   return (
-                    <div key={district} className="flex items-center gap-3">
-                      <span className="text-sm text-gray-600 w-32 text-right truncate">{district}</span>
-                      <div className="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
-                        <div className="h-full rounded-full bg-green-500 flex items-center justify-end pr-2" style={{ width: `${Math.max((count / max) * 100, 10)}%` }}>
-                          <span className="text-xs font-bold text-white">{count}</span>
-                        </div>
+                    <div key={district} className="flex items-center justify-between border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        <span className="text-sm font-medium text-gray-700">{district}</span>
                       </div>
+                      <span className="text-sm font-bold text-gray-900">{count}</span>
                     </div>
                   );
                 })}
@@ -453,17 +446,15 @@ export default function AnalyticsPage() {
           <div className="bg-white rounded-xl shadow p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Products by District</h3>
             {Object.keys(districtDistribution).length > 0 ? (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
+              <div className="space-y-4 max-h-64 overflow-y-auto pt-2">
                 {Object.entries(districtDistribution).sort((a, b) => b[1] - a[1]).map(([district, count]) => {
-                  const max = Math.max(...Object.values(districtDistribution), 1);
                   return (
-                    <div key={district} className="flex items-center gap-3">
-                      <span className="text-sm text-gray-600 w-32 text-right truncate">{district}</span>
-                      <div className="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
-                        <div className="h-full rounded-full bg-green-500 flex items-center justify-end pr-2" style={{ width: `${Math.max((count / max) * 100, 10)}%` }}>
-                          <span className="text-xs font-bold text-white">{count}</span>
-                        </div>
+                    <div key={district} className="flex items-center justify-between border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        <span className="text-sm font-medium text-gray-700">{district}</span>
                       </div>
+                      <span className="text-sm font-bold text-gray-900">{count}</span>
                     </div>
                   );
                 })}
@@ -494,10 +485,20 @@ export default function AnalyticsPage() {
   return (
     <ProtectedRoute>
       <PageTransition>
-        <div className="min-h-screen bg-gray-50 py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
+        <div 
+          className="min-h-screen py-8 relative"
+          style={{
+            backgroundImage: "url('https://res.cloudinary.com/dgyqfax25/image/upload/ANALYTICS_BG_jmohmc.png')",
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundAttachment: 'fixed'
+          }}
+        >
+          <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
+          
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-white/50">
+              <h1 className="text-3xl font-extrabold text-gray-900">Analytics</h1>
               <div className="flex flex-col items-end gap-1">
                 <button
                   onClick={() => setReportModalOpen(true)}

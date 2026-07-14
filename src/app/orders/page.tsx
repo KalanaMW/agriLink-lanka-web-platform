@@ -287,13 +287,23 @@ function OrdersContent() {
   return (
     <ProtectedRoute>
       <PageTransition>
-        <div className="min-h-screen bg-gray-50 py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div 
+          className="min-h-screen py-8 relative"
+          style={{
+            backgroundImage: "url('https://res.cloudinary.com/dgyqfax25/image/upload/ORDERS_BG_frnmaf.png')",
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundAttachment: 'fixed'
+          }}
+        >
+          <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
+          
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-white/50">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
-                <p className="mt-1 text-gray-600">
+                <h1 className="text-3xl font-extrabold text-gray-900">Orders</h1>
+                <p className="mt-2 text-gray-800 font-medium">
                   {user?.role === 'Exporter' ? 'Manage your orders and track deliveries' :
                    user?.role === 'Farmer' ? 'View orders containing your products' :
                    'Manage all platform orders'}

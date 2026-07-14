@@ -75,12 +75,21 @@ export default function ExporterDashboard() {
 
   return (
     <RoleProtectedRoute allowedRoles={['Exporter']}>
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div 
+        className="min-h-screen relative py-8"
+        style={{
+          backgroundImage: "url('https://res.cloudinary.com/dgyqfax25/image/upload/DASHBOARD_BG_bcuuez.png')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed'
+        }}
+      >
+        <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3"><Ship className="w-8 h-8 text-blue-600" /> Exporter Dashboard</h1>
-            <p className="mt-2 text-gray-600">Welcome back, {user?.fullName}!</p>
+          <div className="mb-8 bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-white/50">
+            <h1 className="text-3xl font-extrabold text-gray-900 flex items-center gap-3"><Ship className="w-8 h-8 text-blue-600" /> Exporter Dashboard</h1>
+            <p className="mt-2 text-gray-800 font-medium">Welcome back, {user?.fullName}!</p>
             {!user?.isVerified && (
               <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <div className="flex">

@@ -272,13 +272,23 @@ export default function AdminDashboard() {
 
   return (
     <RoleProtectedRoute allowedRoles={['Admin']}>
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div 
+        className="min-h-screen relative py-8"
+        style={{
+          backgroundImage: "url('https://res.cloudinary.com/dgyqfax25/image/upload/DASHBOARD_BG_bcuuez.png')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed'
+        }}
+      >
+        <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           {/* Header */}
-          <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-white/50">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3"><ShieldAlert className="w-8 h-8 text-blue-600" /> Admin Dashboard</h1>
-              <p className="mt-2 text-gray-600">Platform overview and management.</p>
+              <h1 className="text-3xl font-extrabold text-gray-900 flex items-center gap-3"><ShieldAlert className="w-8 h-8 text-blue-600" /> Admin Dashboard</h1>
+              <p className="mt-2 text-gray-800 font-medium">Platform overview and management.</p>
             </div>
             <div className="flex flex-col items-end gap-2">
               <button

@@ -76,18 +76,25 @@ export default function FarmerDashboard() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className="min-h-screen bg-gray-50"
+        className="min-h-screen relative py-8"
+        style={{
+          backgroundImage: "url('https://res.cloudinary.com/dgyqfax25/image/upload/DASHBOARD_BG_bcuuez.png')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed'
+        }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           {/* Header */}
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="mb-8"
+            className="mb-8 bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-white/50"
           >
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3"><Wheat className="w-8 h-8 text-green-600" /> Farmer Dashboard</h1>
-            <p className="mt-2 text-gray-600">Welcome back, {user?.fullName}!</p>
+            <h1 className="text-3xl font-extrabold text-gray-900 flex items-center gap-3"><Wheat className="w-8 h-8 text-green-600" /> Farmer Dashboard</h1>
+            <p className="mt-2 text-gray-800 font-medium">Welcome back, {user?.fullName}!</p>
           </motion.div>
 
           {/* Stats Cards */}

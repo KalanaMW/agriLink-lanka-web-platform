@@ -20,8 +20,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="flex flex-col min-h-screen">
+    <html lang="en" className="bg-green-800" suppressHydrationWarning>
+      <body className="flex flex-col min-h-screen bg-gray-50">
         <AuthProvider>
           <Navbar />
 

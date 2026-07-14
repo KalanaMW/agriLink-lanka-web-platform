@@ -278,6 +278,7 @@ export default function EditProductPage() {
                   type="date"
                   value={formData.harvestDate}
                   onChange={(e) => setFormData({ ...formData, harvestDate: e.target.value })}
+                  max={new Date().toISOString().split('T')[0]}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                 />
                 {errors.harvestDate && <p className="mt-1 text-sm text-red-600">{errors.harvestDate}</p>}

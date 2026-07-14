@@ -6,6 +6,8 @@ import { productService } from '@/services/productService';
 import { Product, ProductFilter } from '@/types';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { getImageUrl } from '@/lib/utils';
+import { PageTransition } from '@/components/animations/PageTransition';
+import { Search, MapPin, Package, User, CheckCircle, Leaf, Filter, Store, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const DISTRICTS = [
   'Colombo', 'Gampaha', 'Kalutara', 'Kandy', 'Matale', 'Nuwara Eliya',
@@ -80,15 +82,31 @@ export default function ProductsPage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900">Available Products</h1>
-            <p className="mt-2 text-lg text-gray-600">
-              Browse fresh vegetables from verified farmers across Sri Lanka
-            </p>
-          </div>
+      <PageTransition>
+        <div 
+          className="min-h-screen py-10 relative"
+          style={{
+            backgroundImage: "url('https://res.cloudinary.com/dgyqfax25/image/upload/PRODUCTS_BG_kxprpt.png')",
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundAttachment: 'fixed'
+          }}
+        >
+          {/* Optional overlay to soften background */}
+          <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
+          
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            {/* Header */}
+            <div className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-white/50">
+              <div>
+                <h1 className="text-4xl font-extrabold text-gray-900 flex items-center gap-3">
+                  <Store className="w-10 h-10 text-green-600" /> Available Products
+                </h1>
+                <p className="mt-2 text-lg text-gray-800 font-medium">
+                  Browse fresh vegetables from verified farmers across Sri Lanka
+                </p>
+              </div>
+            </div>
 
           {/* Filter Toggle Button (Mobile) */}
           <div className="md:hidden mb-4">
@@ -102,13 +120,15 @@ export default function ProductsPage() {
 
           <div className="flex flex-col md:flex-row gap-8">
             {/* Filters Sidebar */}
-            <div className={`md:w-64 ${showFilters ? 'block' : 'hidden md:block'}`}>
-              <div className="bg-white p-6 rounded-lg shadow-md space-y-6 sticky top-24">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-lg font-bold text-gray-900">Filters</h2>
+            <div className={`md:w-72 flex-shrink-0 ${showFilters ? 'block' : 'hidden md:block'}`}>
+              <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 space-y-6 sticky top-24">
+                <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <Filter className="w-5 h-5 text-green-600" /> Filters
+                  </h2>
                   <button
                     onClick={clearFilters}
-                    className="text-sm text-green-600 hover:text-green-700"
+                    className="text-sm font-semibold text-green-600 hover:text-green-700 hover:underline transition"
                   >
                     Clear All
                   </button>
@@ -116,27 +136,30 @@ export default function ProductsPage() {
 
                 {/* Search by Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Search Product
                   </label>
-                  <input
-                    type="text"
-                    placeholder="e.g., Tomato"
-                    value={filters.vegetableName || ''}
-                    onChange={(e) => handleFilterChange('vegetableName', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
-                  />
+                  <div className="relative">
+                    <Search className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="e.g., Tomato"
+                      value={filters.vegetableName || ''}
+                      onChange={(e) => handleFilterChange('vegetableName', e.target.value)}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-xl bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition shadow-sm"
+                    />
+                  </div>
                 </div>
 
                 {/* District Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     District
                   </label>
                   <select
                     value={filters.district || ''}
                     onChange={(e) => handleFilterChange('district', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition shadow-sm"
                   >
                     <option value="">All Districts</option>
                     {DISTRICTS.map((district) => (
@@ -149,13 +172,13 @@ export default function ProductsPage() {
 
                 {/* Grade Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Grade
                   </label>
                   <select
                     value={filters.grade || ''}
                     onChange={(e) => handleFilterChange('grade', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition shadow-sm"
                   >
                     <option value="">All Grades</option>
                     {GRADES.map((grade) => (
@@ -168,7 +191,7 @@ export default function ProductsPage() {
 
                 {/* Price Range */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Price Range (Rs/kg)
                   </label>
                   <div className="flex gap-2">
@@ -177,21 +200,21 @@ export default function ProductsPage() {
                       placeholder="Min"
                       value={filters.minPrice || ''}
                       onChange={(e) => handleFilterChange('minPrice', e.target.value ? Number(e.target.value) : undefined)}
-                      className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                      className="w-1/2 px-3 py-2 border border-gray-300 rounded-xl bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition shadow-sm"
                     />
                     <input
                       type="number"
                       placeholder="Max"
                       value={filters.maxPrice || ''}
                       onChange={(e) => handleFilterChange('maxPrice', e.target.value ? Number(e.target.value) : undefined)}
-                      className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                      className="w-1/2 px-3 py-2 border border-gray-300 rounded-xl bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition shadow-sm"
                     />
                   </div>
                 </div>
 
                 {/* Quantity Range */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Quantity (kg)
                   </label>
                   <div className="flex gap-2">
@@ -200,14 +223,14 @@ export default function ProductsPage() {
                       placeholder="Min"
                       value={filters.minQuantity || ''}
                       onChange={(e) => handleFilterChange('minQuantity', e.target.value ? Number(e.target.value) : undefined)}
-                      className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                      className="w-1/2 px-3 py-2 border border-gray-300 rounded-xl bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition shadow-sm"
                     />
                     <input
                       type="number"
                       placeholder="Max"
                       value={filters.maxQuantity || ''}
                       onChange={(e) => handleFilterChange('maxQuantity', e.target.value ? Number(e.target.value) : undefined)}
-                      className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                      className="w-1/2 px-3 py-2 border border-gray-300 rounded-xl bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition shadow-sm"
                     />
                   </div>
                 </div>
@@ -236,13 +259,13 @@ export default function ProductsPage() {
 
                 {/* Sort By */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Sort By
                   </label>
                   <select
                     value={filters.sortBy || 'DateDesc'}
                     onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition shadow-sm"
                   >
                     <option value="DateDesc">Newest First</option>
                     <option value="DateAsc">Oldest First</option>
@@ -287,53 +310,64 @@ export default function ProductsPage() {
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {products.map((product) => (
-                      <div key={product.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition">
-                        {product.imageUrl ? (
-                          <img
-                            src={getImageUrl(product.imageUrl)}
-                            alt={product.vegetableName}
-                            className="w-full h-48 object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
-                            <span className="text-gray-400">No Image</span>
+                      <div key={product.id} className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col group">
+                        <div className="relative overflow-hidden">
+                          {product.imageUrl ? (
+                            <img
+                              src={getImageUrl(product.imageUrl)}
+                              alt={product.vegetableName}
+                              className="w-full h-56 object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                          ) : (
+                            <div className="w-full h-56 bg-gray-100 flex items-center justify-center">
+                              <span className="text-gray-400 font-medium">No Image</span>
+                            </div>
+                          )}
+                          <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md text-gray-900 px-3 py-1 rounded-full text-xs font-bold shadow-sm">
+                            Grade {product.grade}
                           </div>
-                        )}
-                        <div className="p-4">
-                          <div className="flex justify-between items-start mb-2">
-                            <h3 className="text-lg font-bold text-gray-900">
-                              {product.vegetableName}
-                              {product.variety && ` - ${product.variety}`}
-                            </h3>
-                            <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded">
-                              Grade {product.grade}
-                            </span>
-                          </div>
+                        </div>
+                        <div className="p-6 flex-1 flex flex-col">
+                          <h3 className="text-xl font-bold text-gray-900 mb-1">
+                            {product.vegetableName}
+                            {product.variety && <span className="text-gray-500 font-normal"> - {product.variety}</span>}
+                          </h3>
                           
-                          <div className="text-2xl font-bold text-green-600 mb-2">
-                            Rs. {product.pricePerKg}/kg
+                          <div className="text-2xl font-black text-green-600 mb-4">
+                            Rs. {product.pricePerKg}<span className="text-sm font-medium text-gray-500">/kg</span>
                           </div>
 
-                          <div className="space-y-1 text-sm text-gray-600 mb-3">
-                            <p>📦 Available: {product.availableQuantityKg} kg{(product.soldQuantityKg ?? 0) > 0 ? ` (${product.soldQuantityKg} kg sold)` : ''}</p>
-                            <p>📍 District: {product.district}</p>
-                            <p>👨‍🌾 {product.farmerName}</p>
+                          <div className="space-y-2 text-sm text-gray-600 mb-6 flex-1">
+                            <p className="flex items-center gap-2">
+                              <Package className="w-4 h-4 text-green-600" />
+                              <span className="font-medium text-gray-900">Available:</span> {product.availableQuantityKg} kg{(product.soldQuantityKg ?? 0) > 0 ? ` (${product.soldQuantityKg} kg sold)` : ''}
+                            </p>
+                            <p className="flex items-center gap-2">
+                              <MapPin className="w-4 h-4 text-blue-500" />
+                              <span className="font-medium text-gray-900">District:</span> {product.district}
+                            </p>
+                            <p className="flex items-center gap-2">
+                              <User className="w-4 h-4 text-orange-500" />
+                              <span className="font-medium text-gray-900">Farmer:</span> {product.farmerName}
+                            </p>
                           </div>
 
-                          <div className="flex gap-2 mb-3">
+                          <div className="flex flex-wrap gap-2 mb-6">
                             {product.isExportReady && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                              <span className="flex items-center text-xs bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded-full font-semibold">
+                                <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
                                 Export Ready
                               </span>
                             )}
                             {product.isOrganic && (
-                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                              <span className="flex items-center text-xs bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded-full font-semibold">
+                                <Leaf className="w-3.5 h-3.5 mr-1.5" />
                                 Organic
                               </span>
                             )}
                           </div>
 
-                          <Link href={`/products/${product.id}`} className="block w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition font-semibold text-center">
+                          <Link href={`/products/${product.id}`} className="block w-full bg-gray-50 border border-gray-200 text-gray-900 py-3 rounded-xl hover:bg-green-600 hover:text-white hover:border-green-600 transition-colors font-bold text-center">
                             View Details
                           </Link>
                         </div>
@@ -347,21 +381,21 @@ export default function ProductsPage() {
                       <button
                         onClick={() => handlePageChange(pagination.currentPage - 1)}
                         disabled={pagination.currentPage === 1}
-                        className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                        className="p-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white bg-gray-50 shadow-sm transition"
                       >
-                        Previous
+                        <ChevronLeft className="w-5 h-5 text-gray-700" />
                       </button>
                       
-                      <span className="text-gray-700">
+                      <span className="text-gray-700 font-medium px-4">
                         Page {pagination.currentPage} of {pagination.totalPages}
                       </span>
 
                       <button
                         onClick={() => handlePageChange(pagination.currentPage + 1)}
                         disabled={pagination.currentPage === pagination.totalPages}
-                        className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                        className="p-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white bg-gray-50 shadow-sm transition"
                       >
-                        Next
+                        <ChevronRight className="w-5 h-5 text-gray-700" />
                       </button>
                     </div>
                   )}
@@ -371,6 +405,7 @@ export default function ProductsPage() {
           </div>
         </div>
       </div>
+      </PageTransition>
     </ProtectedRoute>
   );
 }

@@ -10,17 +10,19 @@ export default function Navbar() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     return (
-        <nav className="bg-gradient-to-r from-green-800 via-green-700 to-green-600 backdrop-blur-md text-white shadow-lg sticky top-0 z-50">
+        <nav className="bg-gradient-to-r from-green-800 via-green-700 to-green-600 backdrop-blur-md text-white shadow-lg sticky top-0 z-[100]">
             <div className="max-w-7xl mx-auto px-4">
                 <div className="flex justify-between items-center h-16">
 
                     {/* Logo Section */}
                     <Link href="/" className="flex items-center gap-3">
-                        <img 
-                            src="https://res.cloudinary.com/dgyqfax25/image/upload/v1761895483/d5513655-e2aa-4582-8bf8-5c3c196fa828_vnk5cq.png" 
-                            alt="AgriLink Lanka Logo" 
-                            className="h-10 w-10 object-contain"
-                        />
+                        <div className="h-10 w-10 bg-white rounded-full p-1 flex items-center justify-center">
+                            <img 
+                                src="https://res.cloudinary.com/dgyqfax25/image/upload/v1761895483/d5513655-e2aa-4582-8bf8-5c3c196fa828_vnk5cq.png" 
+                                alt="AgriLink Lanka Logo" 
+                                className="h-8 w-8 object-contain"
+                            />
+                        </div>
                         <span className="text-xl font-bold">AgriLink Lanka</span>
                     </Link>
 
@@ -29,6 +31,7 @@ export default function Navbar() {
                         <Link href="/" className="hover:text-green-200 transition font-medium">Home</Link>
                         <Link href="/products" className="hover:text-green-200 transition font-medium">Products</Link>
                         <Link href="/about" className="hover:text-green-200 transition font-medium">About</Link>
+                        <Link href="/contact" className="hover:text-green-200 transition font-medium">Contact</Link>
                         {isAuthenticated && (
                             <>
                                 <Link href="/dashboard" className="hover:text-green-200 transition font-medium">Dashboard</Link>
@@ -99,6 +102,7 @@ export default function Navbar() {
                         <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block py-2 hover:text-green-200 transition font-medium">Home</Link>
                         <Link href="/products" onClick={() => setMobileMenuOpen(false)} className="block py-2 hover:text-green-200 transition font-medium">Products</Link>
                         <Link href="/about" onClick={() => setMobileMenuOpen(false)} className="block py-2 hover:text-green-200 transition font-medium">About</Link>
+                        <Link href="/contact" onClick={() => setMobileMenuOpen(false)} className="block py-2 hover:text-green-200 transition font-medium">Contact</Link>
                         {isAuthenticated && (
                             <>
                                 <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} className="block py-2 hover:text-green-200 transition font-medium">Dashboard</Link>

@@ -11,20 +11,51 @@ export default function ContactPage() {
     message: '',
   });
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would send to the backend
-    setSubmitted(true);
+    setSending(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/send-contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to send message');
+      }
+
+      setSubmitted(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to send message. Please try again.');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
     <PageTransition>
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">Contact Us</h1>
-            <p className="text-lg text-gray-600">Have a question or feedback? We&apos;d love to hear from you.</p>
+      <div 
+        className="min-h-screen py-12 relative"
+        style={{
+          backgroundImage: "url('https://res.cloudinary.com/dgyqfax25/image/upload/CONTACT.BG_j6vahc.png')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed'
+        }}
+      >
+        <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
+        
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="text-center mb-12 bg-white/80 backdrop-blur-md p-8 rounded-3xl shadow-sm border border-white/50">
+            <h1 className="text-4xl font-extrabold text-gray-900 mb-4">Contact Us</h1>
+            <p className="text-lg text-gray-800 font-medium">Have a question or feedback? We&apos;d love to hear from you.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -53,7 +84,7 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900">Email</h3>
-                      <p className="text-gray-600 text-sm">support@agrilinklanka.lk</p>
+                      <p className="text-gray-600 text-sm">agrilinklanka@gmail.com</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -64,7 +95,7 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900">Phone</h3>
-                      <p className="text-gray-600 text-sm">+94 11 234 5678</p>
+                      <p className="text-gray-600 text-sm">+94 70 201 8278</p>
                     </div>
                   </div>
                 </div>
@@ -101,6 +132,13 @@ export default function ContactPage() {
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <h2 className="text-xl font-bold text-gray-900 mb-4">Send a Message</h2>
+
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                      {error}
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
                     <input
@@ -135,9 +173,10 @@ export default function ContactPage() {
                   </div>
                   <button
                     type="submit"
-                    className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition"
+                    disabled={sending}
+                    className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
                   >
-                    Send Message
+                    {sending ? 'Sending...' : 'Send Message'}
                   </button>
                 </form>
               )}
