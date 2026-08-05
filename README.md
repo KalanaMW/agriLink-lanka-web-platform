@@ -1,3 +1,5 @@
+# This project was finalized on 5th August 2026.
+
 # AgriLink Lanka
 
 A comprehensive web-based platform that connects farmers and exporters to enable listing, verification, approval, discovery, and purchasing workflows for agricultural produce.
